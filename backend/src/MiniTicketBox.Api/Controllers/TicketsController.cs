@@ -15,12 +15,29 @@ public class TicketsController : ControllerBase
         _ticketService = ticketService;
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetTicketTypes(CancellationToken cancellationToken)
+    {
+        var result = await _ticketService.GetTicketTypesAsync(cancellationToken);
+
+        return Ok(result);
+    }
+
     [HttpPost("reserve")]
     public async Task<IActionResult> Reserve(
         [FromBody] ReserveTicketRequest request,
         CancellationToken cancellationToken)
     {
         var result = await _ticketService.ReserveAsync(request, cancellationToken);
+
+        return Ok(result);
+    }
+    [HttpPost("pay")]
+    public async Task<IActionResult> Pay(
+        [FromBody] PaymentRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _ticketService.PayAsync(request, cancellationToken);
 
         return Ok(result);
     }

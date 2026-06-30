@@ -5,6 +5,7 @@ using MiniTicketBox.Application.Interfaces;
 using MiniTicketBox.Domain.Entities;
 using MiniTicketBox.Infrastructure.Persistence;
 using StackExchange.Redis;
+using MiniTicketBox.Domain.Enums;
 
 namespace MiniTicketBox.Infrastructure.Services;
 
@@ -78,6 +79,76 @@ public class TicketService : ITicketService
         {
             HoldCode = ticketHold.HoldCode,
             ExpiredAt = ticketHold.ExpiredAt
+        };
+    }
+    public async Task<List<TicketTypeResponse>> GetTicketTypesAsync(
+    CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.TicketTypes
+            .AsNoTracking()
+            .OrderBy(x => x.Price)
+            .Select(x => new TicketTypeResponse
+            {
+                Id = x.Id,
+                Name = x.Name,
+                Price = x.Price,
+                TotalQuantity = x.TotalQuantity,
+                AvailableQuantity = x.AvailableQuantity
+            })
+            .ToListAsync(cancellationToken);
+    }
+    public async Task<PaymentResponse> PayAsync(
+    PaymentRequest request,
+    CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.HoldCode))
+            throw new ArgumentException("Hold code is required.");
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var hold = await _dbContext.TicketHolds
+            .Include(x => x.TicketType)
+            .FirstOrDefaultAsync(x => x.HoldCode == request.HoldCode, cancellationToken);
+
+        if (hold is null)
+            throw new InvalidOperationException("Ticket hold not found.");
+
+        if (hold.Status != HoldStatus.Holding)
+            throw new InvalidOperationException("Ticket hold is not available for payment.");
+
+        if (hold.ExpiredAt <= DateTime.UtcNow)
+            throw new InvalidOperationException("Ticket hold has expired.");
+
+        if (hold.TicketType is null)
+            throw new InvalidOperationException("Ticket type not found.");
+
+        var totalAmount = hold.Quantity * hold.TicketType.Price;
+
+        var order = new MiniTicketBox.Domain.Entities.Order(totalAmount);
+
+        var orderItem = new OrderItem(
+            hold.TicketTypeId,
+            hold.Quantity,
+            hold.TicketType.Price
+        );
+
+        order.AddItem(orderItem);
+        order.MarkAsPaid();
+        hold.MarkAsPaid();
+
+        await _dbContext.Orders.AddAsync(order, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var redisDb = _redis.GetDatabase();
+        await redisDb.KeyDeleteAsync($"ticket-hold:{hold.HoldCode}");
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return new PaymentResponse
+        {
+            OrderCode = order.OrderCode,
+            TotalAmount = order.TotalAmount,
+            Status = order.Status.ToString()
         };
     }
 }

@@ -5,6 +5,7 @@ using MiniTicketBox.Infrastructure.Persistence;
 using StackExchange.Redis;
 using MiniTicketBox.Application.Interfaces;
 using MiniTicketBox.Infrastructure.Services;
+using MiniTicketBox.Infrastructure.BackgroundServices;
 namespace MiniTicketBox.Infrastructure;
 
 public static class DependencyInjection
@@ -28,6 +29,7 @@ public static class DependencyInjection
             return ConnectionMultiplexer.Connect(redisConnectionString);
         });
         services.AddScoped<ITicketService, TicketService>();
+        services.AddHostedService<ExpiredTicketHoldBackgroundService>();
         return services;
     }
 }
