@@ -1,0 +1,33 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using MiniTicketBox.Infrastructure.Persistence;
+using StackExchange.Redis;
+using MiniTicketBox.Application.Interfaces;
+using MiniTicketBox.Infrastructure.Services;
+namespace MiniTicketBox.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddDbContext<TicketDbContext>(options =>
+        {
+            options.UseNpgsql(configuration.GetConnectionString("Postgres"));
+        });
+
+        services.AddSingleton<IConnectionMultiplexer>(_ =>
+        {
+            var redisConnectionString = configuration["Redis:ConnectionString"];
+
+            if (string.IsNullOrWhiteSpace(redisConnectionString))
+                throw new InvalidOperationException("Redis connection string is missing.");
+
+            return ConnectionMultiplexer.Connect(redisConnectionString);
+        });
+        services.AddScoped<ITicketService, TicketService>();
+        return services;
+    }
+}
