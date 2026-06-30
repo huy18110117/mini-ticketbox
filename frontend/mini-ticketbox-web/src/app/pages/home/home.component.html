@@ -1,0 +1,51 @@
+<main class="shell">
+    <nav class="topbar">
+        <strong>Mini TicketBox</strong>
+        <span class="spacer"></span>
+        <a routerLink="/booking">Booking</a>
+        <a routerLink="/admin">Admin</a>
+    </nav>
+
+    <section class="hero card">
+        <div>
+            <p class="eyebrow">Live concert · 500 tickets</p>
+            <h1>Reserve tickets in realtime without over-selling.</h1>
+            <p>Inventory updates instantly when users reserve, pay, or when expired holds are released.</p>
+            <a class="button" routerLink="/booking">Choose ticket</a>
+        </div>
+        <div class="metric">
+            <span>Available now</span>
+            <strong>{{ snapshot()?.totalAvailable ?? 0 }}</strong>
+            <small>Realtime: {{ realtime.status() }} · {{ realtime.lastReason() }}</small>
+        </div>
+    </section>
+
+    @if (loading()) {
+    <div class="card muted">Loading inventory...</div>
+    }
+
+    @if (error()) {
+    <div class="alert">{{ error() }}</div>
+    }
+
+    <section class="grid">
+        @for (ticket of snapshot()?.ticketTypes ?? []; track ticket.id) {
+        <article class="card ticket-card">
+            <h2>{{ ticket.name }}</h2>
+            <p>{{ ticket.price | currency:'VND':'symbol':'1.0-0' }}</p>
+            <progress [value]="ticket.availableQuantity" [max]="ticket.totalQuantity"></progress>
+            <div class="row"><span>Available</span><strong>{{ ticket.availableQuantity }}/{{ ticket.totalQuantity
+                    }}</strong></div>
+        </article>
+        }
+    </section>
+
+    <section class="grid stats">
+        <div class="card"><span>Holding</span><strong>{{ snapshot()?.totalHolding ?? 0 }}</strong></div>
+        <div class="card"><span>Sold</span><strong>{{ snapshot()?.totalSold ?? 0 }}</strong></div>
+        <div class="card"><span>Revenue</span><strong>{{ snapshot()?.revenue ?? 0 | currency:'VND':'symbol':'1.0-0'
+                }}</strong></div>
+        <div class="card"><span>Server time</span><strong>{{ snapshot()?.serverTimeUtc | date:'mediumTime' }}</strong>
+        </div>
+    </section>
+</main>

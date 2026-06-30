@@ -1,0 +1,43 @@
+import { Component, OnInit, signal } from '@angular/core';
+import { CurrencyPipe, DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
+import { TicketApiService } from '../../core/ticket-api.service';
+import { TicketRealtimeService } from '../../core/ticket-realtime.service';
+import { AdminDashboard } from '../../core/ticket.models';
+
+@Component({
+  selector: 'app-admin-dashboard',
+  imports: [CurrencyPipe, DatePipe, RouterLink],
+  templateUrl: './admin-dashboard.component.html',
+})
+export class AdminDashboardComponent implements OnInit {
+  readonly dashboard = signal<AdminDashboard | null>(null);
+  readonly loading = signal(true);
+  readonly error = signal('');
+
+  constructor(
+    public readonly realtime: TicketRealtimeService,
+    private readonly api: TicketApiService
+  ) {}
+
+  ngOnInit(): void {
+    this.refresh();
+    this.realtime
+      .connect()
+      .then(() => this.refresh())
+      .catch(() => this.error.set('Realtime connection unavailable.'));
+  }
+
+  refresh(): void {
+    this.api.getAdminDashboard().subscribe({
+      next: (dashboard) => {
+        this.dashboard.set(dashboard);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.error.set('Cannot load admin dashboard.');
+        this.loading.set(false);
+      },
+    });
+  }
+}

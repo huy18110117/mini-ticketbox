@@ -1,0 +1,34 @@
+<main class="shell">
+    <nav class="topbar"><a routerLink="/">← Home</a><button class="button ghost" (click)="refresh()">Refresh</button>
+    </nav>
+
+    <section class="card">
+        <p class="eyebrow">Admin dashboard</p>
+        <h1>Sales and temporary locks</h1>
+        <p class="muted">Realtime status: {{ realtime.status() }} · latest event: {{ realtime.lastReason() }}</p>
+    </section>
+
+    @if (loading()) { <div class="card muted">Loading dashboard...</div> }
+    @if (error()) { <div class="alert">{{ error() }}</div> }
+
+    <section class="grid stats">
+        <div class="card"><span>Sold</span><strong>{{ dashboard()?.totalSold ?? 0 }}</strong></div>
+        <div class="card"><span>Holding</span><strong>{{ dashboard()?.totalHolding ?? 0 }}</strong></div>
+        <div class="card"><span>Revenue</span><strong>{{ dashboard()?.revenue ?? 0 | currency:'VND':'symbol':'1.0-0'
+                }}</strong></div>
+    </section>
+
+    <section class="card">
+        <h2>Active holds</h2>
+        <div class="table">
+            <div class="table-row head"><span>Hold code</span><span>Ticket</span><span>Qty</span><span>Expires</span>
+            </div>
+            @for (hold of dashboard()?.activeHolds ?? []; track hold.id) {
+            <div class="table-row"><span>{{ hold.holdCode }}</span><span>{{ hold.ticketTypeName }}</span><span>{{
+                    hold.quantity }}</span><span>{{ hold.expiredAt | date:'mediumTime' }}</span></div>
+            } @empty {
+            <p class="muted">No temporary locks right now.</p>
+            }
+        </div>
+    </section>
+</main>

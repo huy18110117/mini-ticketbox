@@ -15,4 +15,10 @@ public interface ITicketService
     Task<PaymentResponse> PayAsync(
         PaymentRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<TicketInventorySnapshotResponse> GetInventorySnapshotAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<AdminDashboardResponse> GetAdminDashboardAsync(
+        CancellationToken cancellationToken = default);
 }

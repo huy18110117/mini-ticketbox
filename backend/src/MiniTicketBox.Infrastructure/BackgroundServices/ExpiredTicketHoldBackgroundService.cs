@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MiniTicketBox.Domain.Enums;
+using MiniTicketBox.Application.Interfaces;
+using MiniTicketBox.Application.Realtime;
 using MiniTicketBox.Infrastructure.Persistence;
 using StackExchange.Redis;
 
@@ -46,6 +48,8 @@ public class ExpiredTicketHoldBackgroundService : BackgroundService
         using var scope = _scopeFactory.CreateScope();
 
         var dbContext = scope.ServiceProvider.GetRequiredService<TicketDbContext>();
+        var ticketService = scope.ServiceProvider.GetRequiredService<ITicketService>();
+        var realtimeNotifier = scope.ServiceProvider.GetRequiredService<ITicketRealtimeNotifier>();
         var redisDb = _redis.GetDatabase();
 
         var now = DateTime.UtcNow;
@@ -70,6 +74,9 @@ public class ExpiredTicketHoldBackgroundService : BackgroundService
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        var snapshot = await ticketService.GetInventorySnapshotAsync(cancellationToken);
+        await realtimeNotifier.BroadcastInventoryChangedAsync("released", snapshot, cancellationToken);
 
         _logger.LogInformation("Released {Count} expired ticket holds.", expiredHolds.Count);
     }

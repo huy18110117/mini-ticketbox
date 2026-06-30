@@ -1,0 +1,40 @@
+<main class="shell">
+    <nav class="topbar"><a routerLink="/">← Home</a><a routerLink="/admin">Admin</a></nav>
+
+    <section class="card">
+        <p class="eyebrow">Booking</p>
+        <h1>Choose your ticket</h1>
+        <p class="muted">Buttons are disabled while requests are processing to prevent spam clicks under high load.</p>
+
+        @if (error()) { <div class="alert">{{ error() }}</div> }
+        @if (message()) { <div class="success">{{ message() }}</div> }
+
+        <label>Ticket type</label>
+        <select [ngModel]="selectedTicketTypeId()" (ngModelChange)="selectedTicketTypeId.set($event)"
+            [disabled]="busy() || !!hold()">
+            @for (ticket of tickets(); track ticket.id) {
+            <option [value]="ticket.id">{{ ticket.name }} · {{ ticket.price | currency:'VND':'symbol':'1.0-0' }} · left
+                {{ ticket.availableQuantity }}</option>
+            }
+        </select>
+
+        <label>Quantity</label>
+        <input type="number" min="1" max="10" [ngModel]="quantity()" (ngModelChange)="quantity.set(+$event)"
+            [disabled]="busy() || !!hold()" />
+
+        <button class="button" (click)="reserve()" [disabled]="!canReserve()">
+            {{ busy() && !hold() ? 'Reserving...' : 'Reserve for 5 minutes' }}
+        </button>
+    </section>
+
+    @if (hold()) {
+    <section class="card hold-box">
+        <span>Hold code</span>
+        <strong>{{ hold()?.holdCode }}</strong>
+        <div class="countdown">{{ countdown() }}</div>
+        <button class="button pay" (click)="pay()" [disabled]="busy() || remainingSeconds() === 0">
+            {{ busy() ? 'Processing...' : 'Pay now' }}
+        </button>
+    </section>
+    }
+</main>

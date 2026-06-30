@@ -6,6 +6,7 @@ using MiniTicketBox.Domain.Entities;
 using MiniTicketBox.Infrastructure.Persistence;
 using StackExchange.Redis;
 using MiniTicketBox.Domain.Enums;
+using MiniTicketBox.Application.Realtime;
 
 namespace MiniTicketBox.Infrastructure.Services;
 
@@ -13,13 +14,16 @@ public class TicketService : ITicketService
 {
     private readonly TicketDbContext _dbContext;
     private readonly IConnectionMultiplexer _redis;
+    private readonly ITicketRealtimeNotifier _realtimeNotifier;
 
     public TicketService(
         TicketDbContext dbContext,
-        IConnectionMultiplexer redis)
+        IConnectionMultiplexer redis,
+        ITicketRealtimeNotifier realtimeNotifier)
     {
         _dbContext = dbContext;
         _redis = redis;
+        _realtimeNotifier = realtimeNotifier;
     }
 
     public async Task<ReserveTicketResponse> ReserveAsync(
@@ -75,6 +79,8 @@ public class TicketService : ITicketService
 
         await transaction.CommitAsync(cancellationToken);
 
+        await BroadcastInventoryChangedAsync("reserved", cancellationToken);
+
         return new ReserveTicketResponse
         {
             HoldCode = ticketHold.HoldCode,
@@ -97,6 +103,68 @@ public class TicketService : ITicketService
             })
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<TicketInventorySnapshotResponse> GetInventorySnapshotAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var ticketTypes = await GetTicketTypesAsync(cancellationToken);
+        var totalHolding = await _dbContext.TicketHolds
+            .AsNoTracking()
+            .Where(x => x.Status == HoldStatus.Holding && x.ExpiredAt > DateTime.UtcNow)
+            .SumAsync(x => x.Quantity, cancellationToken);
+
+        var revenue = await _dbContext.Orders
+            .AsNoTracking()
+            .Where(x => x.Status == OrderStatus.Paid)
+            .SumAsync(x => (decimal?)x.TotalAmount, cancellationToken) ?? 0;
+
+        var totalSold = await _dbContext.Orders
+            .AsNoTracking()
+            .Where(x => x.Status == OrderStatus.Paid)
+            .SelectMany(x => x.Items)
+            .SumAsync(x => (int?)x.Quantity, cancellationToken) ?? 0;
+
+        return new TicketInventorySnapshotResponse
+        {
+            ServerTimeUtc = DateTime.UtcNow,
+            TicketTypes = ticketTypes,
+            TotalAvailable = ticketTypes.Sum(x => x.AvailableQuantity),
+            TotalHolding = totalHolding,
+            TotalSold = totalSold,
+            Revenue = revenue
+        };
+    }
+
+    public async Task<AdminDashboardResponse> GetAdminDashboardAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await GetInventorySnapshotAsync(cancellationToken);
+        var activeHolds = await _dbContext.TicketHolds
+            .AsNoTracking()
+            .Include(x => x.TicketType)
+            .Where(x => x.Status == HoldStatus.Holding && x.ExpiredAt > DateTime.UtcNow)
+            .OrderBy(x => x.ExpiredAt)
+            .Select(x => new ActiveTicketHoldResponse
+            {
+                Id = x.Id,
+                HoldCode = x.HoldCode,
+                TicketTypeId = x.TicketTypeId,
+                TicketTypeName = x.TicketType == null ? string.Empty : x.TicketType.Name,
+                Quantity = x.Quantity,
+                ExpiredAt = x.ExpiredAt
+            })
+            .ToListAsync(cancellationToken);
+
+        return new AdminDashboardResponse
+        {
+            TotalSold = snapshot.TotalSold,
+            TotalHolding = snapshot.TotalHolding,
+            Revenue = snapshot.Revenue,
+            ServerTimeUtc = snapshot.ServerTimeUtc,
+            ActiveHolds = activeHolds
+        };
+    }
+
     public async Task<PaymentResponse> PayAsync(
     PaymentRequest request,
     CancellationToken cancellationToken = default)
@@ -144,11 +212,21 @@ public class TicketService : ITicketService
 
         await transaction.CommitAsync(cancellationToken);
 
+        await BroadcastInventoryChangedAsync("paid", cancellationToken);
+
         return new PaymentResponse
         {
             OrderCode = order.OrderCode,
             TotalAmount = order.TotalAmount,
             Status = order.Status.ToString()
         };
+    }
+
+    private async Task BroadcastInventoryChangedAsync(
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        var snapshot = await GetInventorySnapshotAsync(cancellationToken);
+        await _realtimeNotifier.BroadcastInventoryChangedAsync(reason, snapshot, cancellationToken);
     }
 }
