@@ -80,6 +80,14 @@ export class BookingComponent implements OnInit, OnDestroy {
 
   private timer?: Subscription;
 
+  private get activeHoldStorage(): Storage | null {
+    try {
+      return window.localStorage;
+    } catch {
+      return null;
+    }
+  }
+
   constructor(
     public readonly realtime: TicketRealtimeService,
     private readonly api: TicketApiService
@@ -272,6 +280,8 @@ export class BookingComponent implements OnInit, OnDestroy {
       'Ticket hold is not available for payment.': 'Lượt giữ vé không còn khả dụng để thanh toán.',
       'Ticket hold is not available for cancellation.': 'Lượt giữ vé không còn khả dụng để hủy.',
       'Ticket hold has expired.': 'Lượt giữ vé đã hết hạn.',
+      'Lượt giữ vé không khả dụng để thanh toán.': 'Lượt giữ vé không còn khả dụng để thanh toán.',
+      'Lượt giữ vé không còn khả dụng để hủy.': 'Lượt giữ vé không còn khả dụng để hủy.',
     };
 
     return translations[normalizedMessage] ?? normalizedMessage;
@@ -297,16 +307,21 @@ export class BookingComponent implements OnInit, OnDestroy {
   }
 
   private restoreActiveHold(): void {
-    const storedHold = localStorage.getItem(this.activeHoldStorageKey);
+    const storedHold = this.activeHoldStorage?.getItem(this.activeHoldStorageKey);
 
     if (!storedHold) {
       return;
     }
 
     try {
-      const hold = JSON.parse(storedHold) as ReserveTicketResponse;
-      this.syncServerClock(hold.serverTimeUtc);
-      const expires = new Date(hold.expiredAt).getTime();
+      const stored = JSON.parse(storedHold) as StoredActiveHold;
+      const hold = this.toReserveTicketResponse(stored);
+      const storedOffsetMs = stored.serverClockOffsetMs;
+      this.serverClockOffsetMs =
+        typeof storedOffsetMs === 'number' && Number.isFinite(storedOffsetMs)
+          ? storedOffsetMs
+          : 0;
+      const expires = this.parseUtcDateMs(hold.expiredAt);
 
       if (!hold.holdCode || Number.isNaN(expires) || expires <= this.nowMs()) {
         this.clearActiveHold();
@@ -324,11 +339,17 @@ export class BookingComponent implements OnInit, OnDestroy {
   }
 
   private saveActiveHold(hold: ReserveTicketResponse): void {
-    localStorage.setItem(this.activeHoldStorageKey, JSON.stringify(hold));
+    const stored: StoredActiveHold = {
+      ...hold,
+      serverClockOffsetMs: this.serverClockOffsetMs,
+      savedAtClientMs: Date.now(),
+    };
+
+    this.activeHoldStorage?.setItem(this.activeHoldStorageKey, JSON.stringify(stored));
   }
 
   private clearActiveHold(): void {
-    localStorage.removeItem(this.activeHoldStorageKey);
+    this.activeHoldStorage?.removeItem(this.activeHoldStorageKey);
   }
 
   private syncServerClock(serverTimeUtc?: string): void {
@@ -344,4 +365,26 @@ export class BookingComponent implements OnInit, OnDestroy {
   private nowMs(): number {
     return Date.now() + this.serverClockOffsetMs;
   }
+
+  private parseUtcDateMs(value: string): number {
+    if (!value) {
+      return Number.NaN;
+    }
+
+    const normalized = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`;
+    return new Date(normalized).getTime();
+  }
+
+  private toReserveTicketResponse(stored: StoredActiveHold): ReserveTicketResponse {
+    return {
+      holdCode: stored.holdCode,
+      expiredAt: stored.expiredAt,
+      serverTimeUtc: stored.serverTimeUtc,
+    };
+  }
+}
+
+interface StoredActiveHold extends ReserveTicketResponse {
+  serverClockOffsetMs?: number;
+  savedAtClientMs?: number;
 }
