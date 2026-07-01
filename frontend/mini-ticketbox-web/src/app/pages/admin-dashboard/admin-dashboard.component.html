@@ -1,34 +1,106 @@
+<nav class="topbar">
+    <a class="logo-container" routerLink="/">
+        <div class="logo-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
+        </div>
+        <span class="logo-text">Mini TicketBox</span>
+    </a>
+    <div class="nav-buttons">
+        <a routerLink="/booking" routerLinkActive="active" class="nav-btn">Đặt vé</a>
+        <a routerLink="/admin" routerLinkActive="active" class="nav-btn">Quản trị</a>
+    </div>
+</nav>
+
 <main class="shell">
-    <nav class="topbar"><a routerLink="/">← Trang chủ</a><button class="button ghost" (click)="refresh()">Làm mới</button>
-    </nav>
+    <div class="blur-sphere-1"></div>
+    <div class="blur-sphere-2"></div>
 
-    <section class="card">
-        <p class="eyebrow">Bảng quản trị</p>
-        <h1>Doanh số và lượt giữ vé tạm thời</h1>
-        <p class="muted">Trạng thái thời gian thực: {{ realtime.status() }} · sự kiện mới nhất: {{ realtime.lastReason() }}</p>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+        <a class="back-link" style="margin-bottom: 0;" routerLink="/">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+            Trang chủ
+        </a>
+        <button class="admin-btn-ghost" (click)="refresh()">Làm mới</button>
+    </div>
+
+    <section class="container-card">
+        <p class="section-title-eyebrow" style="color: var(--primary-cyan);">Bảng quản trị</p>
+        <h2 class="container-card-title">Doanh số và lượt giữ vé tạm thời</h2>
+        <p class="container-card-subtitle">
+            Trạng thái thời gian thực: {{ realtime.status() }} · sự kiện mới nhất: {{ realtime.lastReason() }}
+        </p>
     </section>
 
-    @if (loading()) { <div class="card muted">Đang tải bảng quản trị...</div> }
-    @if (error()) { <div class="alert">{{ error() }}</div> }
+    @if (loading()) {
+    <div class="alert-banner info-success">
+        <span class="spinner"></span>
+        <span>Đang tải bảng quản trị...</span>
+    </div>
+    }
 
-    <section class="grid stats">
-        <div class="card"><span>Đã bán</span><strong>{{ dashboard()?.totalSold ?? 0 }}</strong></div>
-        <div class="card"><span>Đang giữ</span><strong>{{ dashboard()?.totalHolding ?? 0 }}</strong></div>
-        <div class="card"><span>Doanh thu</span><strong>{{ dashboard()?.revenue ?? 0 | currency:'VND':'symbol':'1.0-0'
-                }}</strong></div>
-    </section>
+    @if (error()) {
+    <div class="alert-banner info-warning">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>{{ error() }}</span>
+    </div>
+    }
 
-    <section class="card">
-        <h2>Lượt giữ vé đang hoạt động</h2>
-        <div class="table">
-            <div class="table-row head"><span>Mã giữ vé</span><span>Vé</span><span>SL</span><span>Hết hạn</span>
+    <section class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 32px;">
+        <div class="stat-box">
+            <div class="stat-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                <span class="stat-label">Đã bán</span>
             </div>
-            @for (hold of dashboard()?.activeHolds ?? []; track hold.id) {
-            <div class="table-row"><span>{{ hold.holdCode }}</span><span>{{ hold.ticketTypeName }}</span><span>{{
-                    hold.quantity }}</span><span>{{ hold.expiredAt | date:'mediumTime' }}</span></div>
-            } @empty {
-            <p class="muted">Hiện không có lượt giữ vé tạm thời.</p>
-            }
+            <p class="stat-value">{{ dashboard()?.totalSold ?? 0 }}</p>
+        </div>
+
+        <div class="stat-box">
+            <div class="stat-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span class="stat-label">Đang giữ</span>
+            </div>
+            <p class="stat-value">{{ dashboard()?.totalHolding ?? 0 }}</p>
+        </div>
+
+        <div class="stat-box">
+            <div class="stat-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>
+                <span class="stat-label">Doanh thu</span>
+            </div>
+            <p class="stat-value">{{ dashboard()?.revenue ?? 0 | currency:'VND':'symbol':'1.0-0' }}</p>
+        </div>
+    </section>
+
+    <section class="container-card">
+        <h3 class="container-card-title" style="font-size: 20px; margin-bottom: 16px;">Lượt giữ vé đang hoạt động</h3>
+        
+        <div class="admin-table-wrapper">
+            <table class="admin-table">
+                <thead>
+                    <tr class="admin-table-head">
+                        <th class="admin-table-head-cell">Mã giữ vé</th>
+                        <th class="admin-table-head-cell">Vé</th>
+                        <th class="admin-table-head-cell">SL</th>
+                        <th class="admin-table-head-cell">Hết hạn</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (hold of dashboard()?.activeHolds ?? []; track hold.id) {
+                    <tr class="admin-table-row">
+                        <td class="admin-table-cell code">{{ hold.holdCode }}</td>
+                        <td class="admin-table-cell" style="font-weight: 500;">{{ hold.ticketTypeName }}</td>
+                        <td class="admin-table-cell mono">{{ hold.quantity }}</td>
+                        <td class="admin-table-cell mono">{{ hold.expiredAt | date:'HH:mm:ss' }}</td>
+                    </tr>
+                    } @empty {
+                    <tr>
+                        <td colspan="4" class="admin-table-cell" style="text-align: center; color: var(--slate-500); padding: 32px 0;">
+                            Hiện không có lượt giữ vé tạm thời.
+                        </td>
+                    </tr>
+                    }
+                </tbody>
+            </table>
         </div>
     </section>
 </main>

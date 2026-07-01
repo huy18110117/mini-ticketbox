@@ -28,6 +28,17 @@ export class BookingComponent implements OnInit, OnDestroy {
   readonly customerName = signal('');
   readonly customerEmail = signal('');
   readonly submittedPayment = signal(false);
+  readonly showDropdown = signal(false);
+
+  readonly selectedTicket = computed(() => {
+    const id = this.selectedTicketTypeId();
+    return this.tickets().find((t) => t.id === id) || null;
+  });
+
+  readonly maxQuantity = computed(() => {
+    const ticket = this.selectedTicket();
+    return ticket ? Math.min(ticket.availableQuantity, 10) : 10;
+  });
 
   readonly canReserve = computed(
     () => !!this.selectedTicketTypeId() && !this.busy() && !this.hold()
@@ -97,6 +108,38 @@ export class BookingComponent implements OnInit, OnDestroy {
       },
       error: () => this.error.set('Không thể tải danh sách loại vé.'),
     });
+  }
+
+  toggleDropdown(): void {
+    if (this.busy() || this.hold()) {
+      return;
+    }
+    this.showDropdown.set(!this.showDropdown());
+  }
+
+  selectTicketType(id: string): void {
+    this.selectedTicketTypeId.set(id);
+    this.showDropdown.set(false);
+  }
+
+  incrementQuantity(): void {
+    if (this.busy() || this.hold()) return;
+    const ticket = this.selectedTicket();
+    if (!ticket) return;
+    const maxVal = Math.min(ticket.availableQuantity, 10);
+    this.quantity.set(Math.min(maxVal, this.quantity() + 1));
+  }
+
+  decrementQuantity(): void {
+    if (this.busy() || this.hold()) return;
+    this.quantity.set(Math.max(1, this.quantity() - 1));
+  }
+
+  onQuantityChange(value: number): void {
+    const ticket = this.selectedTicket();
+    const maxVal = ticket ? Math.min(ticket.availableQuantity, 10) : 10;
+    const val = Math.max(1, Math.min(maxVal, value));
+    this.quantity.set(val);
   }
 
   reserve(): void {

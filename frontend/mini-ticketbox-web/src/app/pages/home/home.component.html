@@ -1,51 +1,129 @@
-<main class="shell">
-    <nav class="topbar">
-        <strong>Mini TicketBox</strong>
-        <span class="spacer"></span>
-        <a routerLink="/booking">Đặt vé</a>
-        <a routerLink="/admin">Quản trị</a>
-    </nav>
-
-    <section class="hero card">
-        <div>
-            <p class="eyebrow">Liveshow · 500 vé</p>
-            <h1>Giữ vé theo thời gian thực, không bán vượt số lượng.</h1>
-            <p>Tồn kho cập nhật ngay khi người dùng giữ vé, thanh toán hoặc khi lượt giữ vé hết hạn được trả lại.</p>
-            <a class="button" routerLink="/booking">Chọn vé</a>
+<nav class="topbar">
+    <a class="logo-container" routerLink="/">
+        <div class="logo-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
         </div>
-        <div class="metric">
-            <span>Đang còn</span>
-            <strong>{{ snapshot()?.totalAvailable ?? 0 }}</strong>
-            <small>Thời gian thực: {{ realtime.status() }} · {{ realtime.lastReason() }}</small>
+        <span class="logo-text">Mini TicketBox</span>
+    </a>
+    <div class="nav-buttons">
+        <a routerLink="/booking" routerLinkActive="active" class="nav-btn">Đặt vé</a>
+        <a routerLink="/admin" routerLinkActive="active" class="nav-btn">Quản trị</a>
+    </div>
+</nav>
+
+<main class="shell">
+    <div class="blur-sphere-1"></div>
+    <div class="blur-sphere-2"></div>
+
+    <div class="eyebrow-badge">
+        <span class="live-dot">
+            <span class="live-dot-ping"></span>
+            <span class="live-dot-solid"></span>
+        </span>
+        <span>Liveshow · 500 vé</span>
+    </div>
+
+    <section class="hero-section">
+        <div class="hero-content">
+            <h1 class="hero-title">
+                Giữ vé theo <span class="gradient-text">thời gian thực,</span> không bán vượt số lượng.
+            </h1>
+            <p class="hero-desc">Tồn kho cập nhật ngay khi người dùng giữ vé, thanh toán hoặc khi lượt giữ vé hết hạn được trả lại.</p>
+            <a class="hero-button" routerLink="/booking">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
+                Chọn vé ngay
+            </a>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label-container">
+                <span class="live-dot">
+                    <span class="live-dot-ping"></span>
+                    <span class="live-dot-solid"></span>
+                </span>
+                <span class="metric-label">Đang còn</span>
+            </div>
+            <p class="metric-value-huge">{{ snapshot()?.totalAvailable ?? 0 }}</p>
+            <p class="metric-subtext">Thời gian thực: {{ realtime.status() }} · {{ realtime.lastReason() }}</p>
         </div>
     </section>
 
     @if (loading()) {
-    <div class="card muted">Đang tải tồn kho...</div>
+    <div class="alert-banner info-success">
+        <span class="spinner"></span>
+        <span>Đang tải tồn kho...</span>
+    </div>
     }
 
     @if (error()) {
-    <div class="alert">{{ error() }}</div>
+    <div class="alert-banner info-warning">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>{{ error() }}</span>
+    </div>
     }
 
-    <section class="grid">
+    <p class="section-title-eyebrow">Loại vé</p>
+    <section class="ticket-grid">
         @for (ticket of snapshot()?.ticketTypes ?? []; track ticket.id) {
-        <article class="card ticket-card">
-            <h2>{{ ticket.name }}</h2>
-            <p>{{ ticket.price | currency:'VND':'symbol':'1.0-0' }}</p>
-            <progress [value]="ticket.availableQuantity" [max]="ticket.totalQuantity"></progress>
-            <div class="row"><span>Còn lại</span><strong>{{ ticket.availableQuantity }}/{{ ticket.totalQuantity
-                    }}</strong></div>
+        <article class="ticket-card" routerLink="/booking">
+            <div class="ticket-card-hover-border"></div>
+            <div class="ticket-header">
+                <div>
+                    <p class="ticket-name">{{ ticket.name }}</p>
+                    <p class="ticket-price">{{ ticket.price | currency:'VND':'symbol':'1.0-0' }}</p>
+                </div>
+                <div class="ticket-badge" [class.available]="ticket.availableQuantity > 0" [class.full]="ticket.availableQuantity === 0">
+                    {{ ticket.availableQuantity > 0 ? 'Còn vé' : 'Đầy' }}
+                </div>
+            </div>
+            <div>
+                <div class="ticket-stock-info">
+                    <span class="ticket-stock-label">Còn lại</span>
+                    <span class="ticket-stock-nums">{{ ticket.availableQuantity }}/{{ ticket.totalQuantity }}</span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-bar"
+                         [class.blue]="ticket.availableQuantity > 0"
+                         [class.green]="ticket.availableQuantity === 0"
+                         [style.width.%]="(ticket.availableQuantity / ticket.totalQuantity) * 100">
+                    </div>
+                </div>
+            </div>
         </article>
         }
     </section>
 
-    <section class="grid stats">
-        <div class="card"><span>Đang giữ</span><strong>{{ snapshot()?.totalHolding ?? 0 }}</strong></div>
-        <div class="card"><span>Đã bán</span><strong>{{ snapshot()?.totalSold ?? 0 }}</strong></div>
-        <div class="card"><span>Doanh thu</span><strong>{{ snapshot()?.revenue ?? 0 | currency:'VND':'symbol':'1.0-0'
-                }}</strong></div>
-        <div class="card"><span>Giờ máy chủ</span><strong>{{ snapshot()?.serverTimeUtc | date:'mediumTime' }}</strong>
+    <section class="stats-grid">
+        <div class="stat-box">
+            <div class="stat-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span class="stat-label">Đang giữ</span>
+            </div>
+            <p class="stat-value">{{ snapshot()?.totalHolding ?? 0 }}</p>
+        </div>
+
+        <div class="stat-box">
+            <div class="stat-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                <span class="stat-label">Đã bán</span>
+            </div>
+            <p class="stat-value">{{ snapshot()?.totalSold ?? 0 }}</p>
+        </div>
+
+        <div class="stat-box">
+            <div class="stat-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>
+                <span class="stat-label">Doanh thu</span>
+            </div>
+            <p class="stat-value">{{ snapshot()?.revenue ?? 0 | currency:'VND':'symbol':'1.0-0' }}</p>
+        </div>
+
+        <div class="stat-box">
+            <div class="stat-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>
+                <span class="stat-label">Giờ máy chủ</span>
+            </div>
+            <p class="stat-value">{{ snapshot()?.serverTimeUtc | date:'HH:mm:ss' }}</p>
+            <span class="stat-sub">server time</span>
         </div>
     </section>
 </main>
