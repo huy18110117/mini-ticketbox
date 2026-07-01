@@ -1,7 +1,14 @@
 <nav class="topbar">
     <a class="logo-container" routerLink="/">
         <div class="logo-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path
+                    d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+                <path d="M13 5v2" />
+                <path d="M13 17v2" />
+                <path d="M13 11v2" />
+            </svg>
         </div>
         <span class="logo-text">Mini TicketBox</span>
     </a>
@@ -16,63 +23,81 @@
     <div class="blur-sphere-2"></div>
 
     <a class="back-link" routerLink="/">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
+        </svg>
         Trang chủ
     </a>
 
     <section class="container-card">
         <p class="section-title-eyebrow" style="color: var(--primary-cyan);">Đặt vé</p>
         <h2 class="container-card-title">Chọn vé của bạn</h2>
-        <p class="container-card-subtitle">Các nút sẽ bị vô hiệu hóa khi yêu cầu đang xử lý để tránh bấm liên tục khi tải cao.</p>
+        <p class="container-card-subtitle">Các nút sẽ bị vô hiệu hóa khi yêu cầu đang xử lý để tránh bấm liên tục khi
+            tải cao.</p>
 
         @if (hold() && !submittedPayment() && !error()) {
         <div class="alert-banner info-success">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="m9 12 2 2 4-4" />
+            </svg>
             <span>Vé đã được giữ trong 5 phút. Vui lòng hoàn tất thanh toán trước khi hết thời gian.</span>
         </div>
         }
 
         @if (message() && submittedPayment() && !hold()) {
         <div class="alert-banner info-success">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="m9 12 2 2 4-4" />
+            </svg>
             <span>{{ message() }}</span>
         </div>
         }
 
         @if (error()) {
         <div class="alert-banner info-warning">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+            </svg>
             <span>{{ error() }}</span>
         </div>
         }
 
         <div class="input-group">
             <label class="input-label">Loại vé</label>
-            <button class="custom-select-trigger"
-                    [class.active]="showDropdown()"
-                    [disabled]="busy() || !!hold()"
-                    (click)="toggleDropdown()">
+            <button class="custom-select-trigger" [class.active]="showDropdown()" [disabled]="busy() || !!hold()"
+                (click)="toggleDropdown()">
                 <span>
                     @if (selectedTicket()) {
-                        <strong style="font-weight: 600;">{{ selectedTicket()?.name }}</strong>
-                        <span style="color: var(--slate-500); margin-left: 8px; font-family: 'JetBrains Mono', monospace;">
-                            {{ selectedTicket()?.price | currency:'VND':'symbol':'1.0-0' }} · còn {{ selectedTicket()?.availableQuantity }}
-                        </span>
+                    <strong style="font-weight: 600;">{{ selectedTicket()?.name }}</strong>
+                    <span style="color: var(--slate-500); margin-left: 8px; font-family: 'JetBrains Mono', monospace;">
+                        {{ selectedTicket()?.price | currency:'VND':'symbol':'1.0-0' }} · còn {{
+                        selectedTicket()?.availableQuantity }}
+                    </span>
                     } @else {
-                        Chọn loại vé...
+                    Chọn loại vé...
                     }
                 </span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                     [style.transform]="showDropdown() ? 'rotate(180deg)' : 'none'"
-                     style="transition: transform 0.2s; color: var(--slate-500);"><path d="m6 9 6 6 6-6"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    [style.transform]="showDropdown() ? 'rotate(180deg)' : 'none'"
+                    style="transition: transform 0.2s; color: var(--slate-500);">
+                    <path d="m6 9 6 6 6-6" />
+                </svg>
             </button>
 
             @if (showDropdown()) {
             <div class="custom-select-dropdown">
                 @for (ticket of tickets(); track ticket.id) {
-                <button class="custom-select-option"
-                        [class.selected]="ticket.id === selectedTicketTypeId()"
-                        (click)="selectTicketType(ticket.id)">
+                <button class="custom-select-option" [class.selected]="ticket.id === selectedTicketTypeId()"
+                    (click)="selectTicketType(ticket.id)">
                     <span style="font-weight: 500;">{{ ticket.name }}</span>
                     <span style="font-family: 'JetBrains Mono', monospace; color: var(--slate-500);">
                         {{ ticket.price | currency:'VND':'symbol':'1.0-0' }} · còn {{ ticket.availableQuantity }}
@@ -83,25 +108,30 @@
             }
         </div>
 
-        <div class="input-group">
+        <div class="input-group quantity-group">
             <label class="input-label">Số lượng</label>
             <div class="quantity-control-container">
-                <button class="quantity-btn" (click)="decrementQuantity()" [disabled]="busy() || !!hold() || quantity() <= 1">−</button>
-                <input type="number" class="quantity-input" min="1" max="10"
-                       [ngModel]="quantity()"
-                       (ngModelChange)="onQuantityChange(+$event)"
-                       [disabled]="busy() || !!hold()" />
-                <button class="quantity-btn" (click)="incrementQuantity()" [disabled]="busy() || !!hold() || quantity() >= maxQuantity()">+</button>
+                <button class="quantity-btn" (click)="decrementQuantity()"
+                    [disabled]="busy() || !!hold() || quantity() <= 1">−</button>
+                <input type="number" class="quantity-input" min="1" max="10" [ngModel]="quantity()"
+                    (ngModelChange)="onQuantityChange(+$event)" [disabled]="busy() || !!hold()" />
+                <button class="quantity-btn" (click)="incrementQuantity()"
+                    [disabled]="busy() || !!hold() || quantity() >= maxQuantity()">+</button>
             </div>
         </div>
 
-        <button class="action-button primary" data-testid="reserve-button" (click)="reserve()" [disabled]="!canReserve()">
+        <button class="action-button primary" data-testid="reserve-button" (click)="reserve()"
+            [disabled]="!canReserve()">
             @if (busy() && !hold()) {
-                <span class="spinner"></span>
-                <span>Đang giữ vé...</span>
+            <span class="spinner"></span>
+            <span>Đang giữ vé...</span>
             } @else {
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-                Giữ vé trong 5 phút
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="20" height="14" x="2" y="5" rx="2" />
+                <line x1="2" x2="22" y1="10" y2="10" />
+            </svg>
+            Giữ vé trong 5 phút
             }
         </button>
     </section>
@@ -115,19 +145,14 @@
             <p class="hold-countdown" [class.warning-time]="remainingSeconds() <= 60">{{ countdown() }}</p>
             <p class="hold-countdown-sub">
                 @if (remainingSeconds() === 0) {
-                    Hết thời gian giữ vé
-                } @else if (remainingSeconds() <= 60) {
-                    Sắp hết thời gian!
-                } @else {
-                    Thời gian còn lại để thanh toán
-                }
-            </p>
-            <div class="hold-progress-track">
-                <div class="hold-progress-bar"
-                     [class.warning-time]="remainingSeconds() <= 60"
-                     [style.width.%]="(remainingSeconds() / 300) * 100">
-                </div>
-            </div>
+                Hết thời gian giữ vé
+                } @else if (remainingSeconds() <= 60) { Sắp hết thời gian! } @else { Thời gian còn lại để thanh toán }
+                    </p>
+                    <div class="hold-progress-track">
+                        <div class="hold-progress-bar" [class.warning-time]="remainingSeconds() <= 60"
+                            [style.width.%]="(remainingSeconds() / 300) * 100">
+                        </div>
+                    </div>
         </div>
 
         <div class="hold-body-form">
@@ -144,42 +169,49 @@
             <div>
                 <label class="input-label" for="customerName">Họ và tên</label>
                 <input id="customerName" type="text" class="form-input" autocomplete="name" placeholder="Nhập họ và tên"
-                       [ngModel]="customerName()"
-                       (ngModelChange)="customerName.set($event)"
-                       [disabled]="busy() || remainingSeconds() === 0" />
+                    [ngModel]="customerName()" (ngModelChange)="customerName.set($event)"
+                    [disabled]="busy() || remainingSeconds() === 0" />
                 @if (customerNameError()) {
-                    <span class="field-error-small">{{ customerNameError() }}</span>
+                <span class="field-error-small">{{ customerNameError() }}</span>
                 }
             </div>
 
             <div>
                 <label class="input-label" for="customerEmail">Email</label>
-                <input id="customerEmail" type="email" class="form-input" autocomplete="email" placeholder="you@example.com"
-                       [ngModel]="customerEmail()"
-                       (ngModelChange)="customerEmail.set($event)"
-                       [disabled]="busy() || remainingSeconds() === 0" />
+                <input id="customerEmail" type="email" class="form-input" autocomplete="email"
+                    placeholder="you@example.com" [ngModel]="customerEmail()"
+                    (ngModelChange)="customerEmail.set($event)" [disabled]="busy() || remainingSeconds() === 0" />
                 @if (customerEmailError()) {
-                    <span class="field-error-small">{{ customerEmailError() }}</span>
+                <span class="field-error-small">{{ customerEmailError() }}</span>
                 }
             </div>
 
             <button class="action-button success-pay" (click)="pay()" [disabled]="busy() || remainingSeconds() === 0">
                 @if (busy()) {
-                    <span class="spinner"></span>
-                    <span>Đang xử lý...</span>
+                <span class="spinner"></span>
+                <span>Đang xử lý...</span>
                 } @else {
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
-                    Thanh toán ngay
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="m9 12 2 2 4-4" />
+                </svg>
+                Thanh toán ngay
                 }
             </button>
 
-            <button class="action-button cancel-hold" (click)="cancelHold()" [disabled]="busy() || cancellingHold() || remainingSeconds() === 0">
+            <button class="action-button cancel-hold" (click)="cancelHold()"
+                [disabled]="busy() || cancellingHold() || remainingSeconds() === 0">
                 @if (cancellingHold()) {
-                    <span class="spinner"></span>
-                    <span>Đang hủy giữ vé...</span>
+                <span class="spinner"></span>
+                <span>Đang hủy giữ vé...</span>
                 } @else {
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                    Hủy giữ vé
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                </svg>
+                Hủy giữ vé
                 }
             </button>
         </div>
