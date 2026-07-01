@@ -20,6 +20,10 @@ public class TicketHoldConfiguration : IEntityTypeConfiguration<TicketHold>
         builder.HasIndex(x => x.HoldCode)
             .IsUnique();
 
+        builder.HasIndex(x => new { x.Status, x.ExpiredAt });
+
+        builder.HasIndex(x => x.TicketTypeId);
+
         builder.Property(x => x.Quantity)
             .IsRequired();
 

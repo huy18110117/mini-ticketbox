@@ -1,6 +1,6 @@
 # Mini TicketBox
 
-Họ tên: TODO - cập nhật trước khi nộp bài.
+Họ tên: Bùi Đức Huy
 
 Mini TicketBox là ứng dụng fullstack đặt vé concert giới hạn 500 vé, gồm .NET API, PostgreSQL, Redis, SignalR realtime và Angular UI.
 
@@ -60,3 +60,39 @@ cd frontend/mini-ticketbox-web && npm run build
 ```
 
 Kết quả hiện tại: backend tests pass, API build pass, Angular build pass.
+
+## Load test k6: 5.000 người dùng tranh vé
+
+Kịch bản k6 mô phỏng 5.000 người dùng cùng F5 inventory và bấm đặt vé trong cùng một khoảng thời gian:
+
+- Mỗi VU gọi `GET /api/tickets/snapshot` như hành vi F5/liên tục xem tồn kho.
+- Sau đó bấm `POST /api/tickets/reserve` tối đa 3 lần, chấp nhận `409 Conflict` là hết vé/đụng tranh chấp hợp lệ.
+- Người dùng giữ vé thành công sẽ thanh toán giả lập qua `POST /api/tickets/pay` theo tỷ lệ mặc định 85%.
+- Threshold kiểm tra latency, lỗi bất thường và không cho phép oversell/tồn kho âm.
+
+Chạy API trước:
+
+```bash
+docker compose up -d
+dotnet run --project backend/src/MiniTicketBox.Api/MiniTicketBox.Api.csproj
+```
+
+Chạy load test:
+
+```bash
+k6 run k6-ticket-rush.js
+```
+
+Tùy chỉnh nhanh:
+
+```bash
+k6 run -e BASE_URL=http://localhost:5141 -e USERS=5000 -e RUSH_DURATION=60s -e RESERVE_ATTEMPTS=3 -e PAY_RATIO=0.85 k6-ticket-rush.js
+```
+
+Nếu máy local không đủ tài nguyên cho 5.000 VU, nên smoke test trước:
+
+```bash
+k6 run -e USERS=100 -e RUSH_DURATION=30s k6-ticket-rush.js
+```
+
+Nếu chạy test nhiều lần, cần reset database/seed lại tồn kho vì test sẽ thật sự reserve/pay vé.

@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AdminDashboard,
+  PaymentRequest,
   PaymentResponse,
   ReserveTicketRequest,
   ReserveTicketResponse,
@@ -31,8 +32,8 @@ export class TicketApiService {
     );
   }
 
-  pay(holdCode: string): Observable<PaymentResponse> {
-    return this.http.post<PaymentResponse>(`${this.apiUrl}/pay`, { holdCode });
+  pay(request: PaymentRequest): Observable<PaymentResponse> {
+    return this.http.post<PaymentResponse>(`${this.apiUrl}/pay`, request);
   }
 
   getAdminDashboard(): Observable<AdminDashboard> {

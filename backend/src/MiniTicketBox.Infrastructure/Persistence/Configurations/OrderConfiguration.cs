@@ -27,6 +27,14 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasConversion<int>()
             .IsRequired();
 
+        builder.Property(x => x.CustomerName)
+            .HasMaxLength(150)
+            .IsRequired();
+
+        builder.Property(x => x.CustomerEmail)
+            .HasMaxLength(254)
+            .IsRequired();
+
         builder.HasMany(x => x.Items)
             .WithOne(x => x.Order)
             .HasForeignKey(x => x.OrderId)

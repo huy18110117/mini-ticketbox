@@ -13,6 +13,8 @@ import { ReserveTicketResponse, TicketType } from '../../core/ticket.models';
   templateUrl: './booking.component.html',
 })
 export class BookingComponent implements OnInit, OnDestroy {
+  private readonly activeHoldStorageKey = 'mini-ticketbox.activeHold';
+
   readonly tickets = signal<TicketType[]>([]);
   readonly selectedTicketTypeId = signal('');
   readonly quantity = signal(1);
@@ -21,6 +23,9 @@ export class BookingComponent implements OnInit, OnDestroy {
   readonly busy = signal(false);
   readonly message = signal('');
   readonly error = signal('');
+  readonly customerName = signal('');
+  readonly customerEmail = signal('');
+  readonly submittedPayment = signal(false);
 
   readonly canReserve = computed(
     () => !!this.selectedTicketTypeId() && !this.busy() && !this.hold()
@@ -33,6 +38,31 @@ export class BookingComponent implements OnInit, OnDestroy {
     const rest = (seconds % 60).toString().padStart(2, '0');
     return `${minutes}:${rest}`;
   });
+  readonly trimmedCustomerName = computed(() => this.customerName().trim());
+  readonly trimmedCustomerEmail = computed(() => this.customerEmail().trim());
+  readonly customerNameError = computed(() => {
+    if (!this.submittedPayment()) {
+      return '';
+    }
+
+    return this.trimmedCustomerName().length >= 2
+      ? ''
+      : 'Please enter your full name.';
+  });
+  readonly customerEmailError = computed(() => {
+    if (!this.submittedPayment()) {
+      return '';
+    }
+
+    return this.isValidEmail(this.trimmedCustomerEmail())
+      ? ''
+      : 'Please enter a valid email address.';
+  });
+  readonly isCustomerInfoValid = computed(
+    () =>
+      this.trimmedCustomerName().length >= 2 &&
+      this.isValidEmail(this.trimmedCustomerEmail())
+  );
 
   private timer?: Subscription;
 
@@ -42,6 +72,7 @@ export class BookingComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    this.restoreActiveHold();
     this.loadTickets();
     this.realtime
       .connect()
@@ -83,6 +114,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (hold) => {
           this.hold.set(hold);
+          this.saveActiveHold(hold);
           this.startCountdown(hold.expiredAt);
           this.busy.set(false);
           this.message.set(
@@ -101,15 +133,31 @@ export class BookingComponent implements OnInit, OnDestroy {
 
   pay(): void {
     const hold = this.hold();
+    this.submittedPayment.set(true);
+
     if (!hold || this.busy()) {
       return;
     }
 
+    if (!this.isCustomerInfoValid()) {
+      this.error.set('Please enter your name and a valid email before payment.');
+      return;
+    }
+
     this.busy.set(true);
-    this.api.pay(hold.holdCode).subscribe({
+    this.error.set('');
+    this.api.pay({
+      holdCode: hold.holdCode,
+      customerName: this.trimmedCustomerName(),
+      customerEmail: this.trimmedCustomerEmail(),
+    }).subscribe({
       next: (payment) => {
         this.message.set(`Payment success. Order: ${payment.orderCode}`);
         this.hold.set(null);
+        this.customerName.set('');
+        this.customerEmail.set('');
+        this.submittedPayment.set(false);
+        this.clearActiveHold();
         this.remainingSeconds.set(0);
         this.timer?.unsubscribe();
         this.busy.set(false);
@@ -123,6 +171,10 @@ export class BookingComponent implements OnInit, OnDestroy {
     });
   }
 
+  private isValidEmail(email: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
   private startCountdown(expiredAt: string): void {
     this.timer?.unsubscribe();
     const expires = new Date(expiredAt).getTime();
@@ -131,6 +183,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       this.remainingSeconds.set(remaining);
       if (remaining === 0) {
         this.hold.set(null);
+        this.clearActiveHold();
         this.message.set(
           'Hold expired. Tickets are being released back to inventory.'
         );
@@ -139,5 +192,39 @@ export class BookingComponent implements OnInit, OnDestroy {
     };
     tick();
     this.timer = interval(1000).subscribe(tick);
+  }
+
+  private restoreActiveHold(): void {
+    const storedHold = localStorage.getItem(this.activeHoldStorageKey);
+
+    if (!storedHold) {
+      return;
+    }
+
+    try {
+      const hold = JSON.parse(storedHold) as ReserveTicketResponse;
+      const expires = new Date(hold.expiredAt).getTime();
+
+      if (!hold.holdCode || Number.isNaN(expires) || expires <= Date.now()) {
+        this.clearActiveHold();
+        return;
+      }
+
+      this.hold.set(hold);
+      this.startCountdown(hold.expiredAt);
+      this.message.set(
+        'Ticket is still held. Complete payment before countdown ends.'
+      );
+    } catch {
+      this.clearActiveHold();
+    }
+  }
+
+  private saveActiveHold(hold: ReserveTicketResponse): void {
+    localStorage.setItem(this.activeHoldStorageKey, JSON.stringify(hold));
+  }
+
+  private clearActiveHold(): void {
+    localStorage.removeItem(this.activeHoldStorageKey);
   }
 }

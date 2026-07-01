@@ -31,6 +31,16 @@ namespace MiniTicketBox.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("CustomerEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
                     b.Property<string>("OrderCode")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -121,6 +131,8 @@ namespace MiniTicketBox.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("HoldCode")
                         .IsUnique();
+
+                    b.HasIndex("Status", "ExpiredAt");
 
                     b.HasIndex("TicketTypeId");
 

@@ -22,8 +22,8 @@
         <input type="number" min="1" max="10" [ngModel]="quantity()" (ngModelChange)="quantity.set(+$event)"
             [disabled]="busy() || !!hold()" />
 
-        <button class="button" (click)="reserve()" [disabled]="!canReserve()">
-            {{ busy() && !hold() ? 'Reserving...' : 'Reserve for 5 minutes' }}
+        <button class="button" data-testid="reserve-button" (click)="reserve()" [disabled]="!canReserve()">
+            {{ busy() && !hold() ? 'Đang giữ vé...' : 'Reserve for 5 minutes' }}
         </button>
     </section>
 
@@ -32,6 +32,21 @@
         <span>Hold code</span>
         <strong>{{ hold()?.holdCode }}</strong>
         <div class="countdown">{{ countdown() }}</div>
+
+        <div class="customer-form">
+            <label for="customerName">Name</label>
+            <input id="customerName" type="text" autocomplete="name" placeholder="Enter your full name"
+                [ngModel]="customerName()" (ngModelChange)="customerName.set($event)"
+                [disabled]="busy() || remainingSeconds() === 0" />
+            @if (customerNameError()) { <small class="field-error">{{ customerNameError() }}</small> }
+
+            <label for="customerEmail">Email</label>
+            <input id="customerEmail" type="email" autocomplete="email" placeholder="you@example.com"
+                [ngModel]="customerEmail()" (ngModelChange)="customerEmail.set($event)"
+                [disabled]="busy() || remainingSeconds() === 0" />
+            @if (customerEmailError()) { <small class="field-error">{{ customerEmailError() }}</small> }
+        </div>
+
         <button class="button pay" (click)="pay()" [disabled]="busy() || remainingSeconds() === 0">
             {{ busy() ? 'Processing...' : 'Pay now' }}
         </button>

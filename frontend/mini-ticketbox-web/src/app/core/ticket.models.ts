@@ -25,6 +25,12 @@ export interface ReserveTicketResponse {
   expiredAt: string;
 }
 
+export interface PaymentRequest {
+  holdCode: string;
+  customerName: string;
+  customerEmail: string;
+}
+
 export interface PaymentResponse {
   orderCode: string;
   totalAmount: number;

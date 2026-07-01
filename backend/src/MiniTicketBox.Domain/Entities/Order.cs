@@ -11,19 +11,31 @@ public class Order : BaseEntity
 
     public OrderStatus Status { get; private set; } = OrderStatus.Pending;
 
+    public string CustomerName { get; private set; } = string.Empty;
+
+    public string CustomerEmail { get; private set; } = string.Empty;
+
     public List<OrderItem> Items { get; private set; } = new();
 
     private Order()
     {
     }
 
-    public Order(decimal totalAmount)
+    public Order(decimal totalAmount, string customerName, string customerEmail)
     {
         if (totalAmount < 0)
             throw new ArgumentException("Total amount cannot be negative.");
 
+        if (string.IsNullOrWhiteSpace(customerName))
+            throw new ArgumentException("Customer name is required.");
+
+        if (string.IsNullOrWhiteSpace(customerEmail))
+            throw new ArgumentException("Customer email is required.");
+
         OrderCode = GenerateOrderCode();
         TotalAmount = totalAmount;
+        CustomerName = customerName.Trim();
+        CustomerEmail = customerEmail.Trim().ToLowerInvariant();
         Status = OrderStatus.Pending;
     }
 

@@ -1,0 +1,39 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "MiniTicketBox.Application/1.0.0": {
+        "dependencies": {
+          "MiniTicketBox.Domain": "1.0.0"
+        },
+        "runtime": {
+          "MiniTicketBox.Application.dll": {}
+        }
+      },
+      "MiniTicketBox.Domain/1.0.0": {
+        "runtime": {
+          "MiniTicketBox.Domain.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "MiniTicketBox.Application/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "MiniTicketBox.Domain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

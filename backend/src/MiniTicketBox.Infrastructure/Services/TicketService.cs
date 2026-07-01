@@ -7,11 +7,16 @@ using MiniTicketBox.Infrastructure.Persistence;
 using StackExchange.Redis;
 using MiniTicketBox.Domain.Enums;
 using MiniTicketBox.Application.Realtime;
+using System.Text.RegularExpressions;
 
 namespace MiniTicketBox.Infrastructure.Services;
 
 public class TicketService : ITicketService
 {
+    private static readonly Regex EmailRegex = new(
+        @"^[^\s@]+@[^\s@]+\.[^\s@]+$",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     private readonly TicketDbContext _dbContext;
     private readonly IConnectionMultiplexer _redis;
     private readonly ITicketRealtimeNotifier _realtimeNotifier;
@@ -172,11 +177,26 @@ public class TicketService : ITicketService
         if (string.IsNullOrWhiteSpace(request.HoldCode))
             throw new ArgumentException("Hold code is required.");
 
+        var customerName = request.CustomerName.Trim();
+        var customerEmail = request.CustomerEmail.Trim();
+
+        if (customerName.Length < 2)
+            throw new ArgumentException("Customer name is required.");
+
+        if (!EmailRegex.IsMatch(customerEmail))
+            throw new ArgumentException("A valid customer email is required.");
+
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         var hold = await _dbContext.TicketHolds
+            .FromSqlInterpolated($"""
+                SELECT *
+                FROM "TicketHolds"
+                WHERE "HoldCode" = {request.HoldCode}
+                FOR UPDATE
+                """)
             .Include(x => x.TicketType)
-            .FirstOrDefaultAsync(x => x.HoldCode == request.HoldCode, cancellationToken);
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (hold is null)
             throw new InvalidOperationException("Ticket hold not found.");
@@ -192,7 +212,10 @@ public class TicketService : ITicketService
 
         var totalAmount = hold.Quantity * hold.TicketType.Price;
 
-        var order = new MiniTicketBox.Domain.Entities.Order(totalAmount);
+        var order = new MiniTicketBox.Domain.Entities.Order(
+            totalAmount,
+            customerName,
+            customerEmail);
 
         var orderItem = new OrderItem(
             hold.TicketTypeId,

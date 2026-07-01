@@ -16,7 +16,12 @@ public static class DependencyInjection
     {
         services.AddDbContext<TicketDbContext>(options =>
         {
-            options.UseNpgsql(configuration.GetConnectionString("Postgres"));
+            options.UseNpgsql(
+                configuration.GetConnectionString("Postgres"),
+                npgsqlOptions => npgsqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 3,
+                    maxRetryDelay: TimeSpan.FromSeconds(2),
+                    errorCodesToAdd: null));
         });
 
         services.AddSingleton<IConnectionMultiplexer>(_ =>

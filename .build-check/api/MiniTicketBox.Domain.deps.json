@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "MiniTicketBox.Domain/1.0.0": {
+        "runtime": {
+          "MiniTicketBox.Domain.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "MiniTicketBox.Domain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
