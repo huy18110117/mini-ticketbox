@@ -60,7 +60,8 @@ public class TicketService : ITicketService
 
         ticketType.Reserve(request.Quantity);
 
-        var expiredAt = DateTime.UtcNow.AddMinutes(5);
+        var serverTimeUtc = DateTime.UtcNow;
+        var expiredAt = serverTimeUtc.AddMinutes(5);
 
         var ticketHold = new TicketHold(
             ticketType.Id,
@@ -89,7 +90,8 @@ public class TicketService : ITicketService
         return new ReserveTicketResponse
         {
             HoldCode = ticketHold.HoldCode,
-            ExpiredAt = ticketHold.ExpiredAt
+            ExpiredAt = ticketHold.ExpiredAt,
+            ServerTimeUtc = serverTimeUtc
         };
     }
     public async Task<List<TicketTypeResponse>> GetTicketTypesAsync(

@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { interval, Subscription } from 'rxjs';
@@ -15,6 +15,7 @@ import { ReserveTicketResponse, TicketType } from '../../core/ticket.models';
 })
 export class BookingComponent implements OnInit, OnDestroy {
   private readonly activeHoldStorageKey = 'mini-ticketbox.activeHold';
+  private serverClockOffsetMs = 0;
 
   readonly tickets = signal<TicketType[]>([]);
   readonly selectedTicketTypeId = signal('');
@@ -114,6 +115,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       })
       .subscribe({
         next: (hold) => {
+          this.syncServerClock(hold.serverTimeUtc);
           this.hold.set(hold);
           this.saveActiveHold(hold);
           this.startCountdown(hold.expiredAt);
@@ -200,7 +202,7 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.timer?.unsubscribe();
     const expires = new Date(expiredAt).getTime();
     const tick = () => {
-      const remaining = Math.max(0, Math.ceil((expires - Date.now()) / 1000));
+      const remaining = Math.max(0, Math.ceil((expires - this.nowMs()) / 1000));
       this.remainingSeconds.set(remaining);
       if (remaining === 0) {
         this.hold.set(null);
@@ -224,9 +226,10 @@ export class BookingComponent implements OnInit, OnDestroy {
 
     try {
       const hold = JSON.parse(storedHold) as ReserveTicketResponse;
+      this.syncServerClock(hold.serverTimeUtc);
       const expires = new Date(hold.expiredAt).getTime();
 
-      if (!hold.holdCode || Number.isNaN(expires) || expires <= Date.now()) {
+      if (!hold.holdCode || Number.isNaN(expires) || expires <= this.nowMs()) {
         this.clearActiveHold();
         return;
       }
@@ -247,5 +250,19 @@ export class BookingComponent implements OnInit, OnDestroy {
 
   private clearActiveHold(): void {
     localStorage.removeItem(this.activeHoldStorageKey);
+  }
+
+  private syncServerClock(serverTimeUtc?: string): void {
+    if (!serverTimeUtc) {
+      this.serverClockOffsetMs = 0;
+      return;
+    }
+
+    const serverTime = new Date(serverTimeUtc).getTime();
+    this.serverClockOffsetMs = Number.isNaN(serverTime) ? 0 : serverTime - Date.now();
+  }
+
+  private nowMs(): number {
+    return Date.now() + this.serverClockOffsetMs;
   }
 }

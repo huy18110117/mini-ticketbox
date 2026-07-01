@@ -2,9 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using MiniTicketBox.Domain.Enums;
 using MiniTicketBox.Application.Interfaces;
 using MiniTicketBox.Application.Realtime;
+using MiniTicketBox.Domain.Enums;
 using MiniTicketBox.Infrastructure.Persistence;
 using StackExchange.Redis;
 
@@ -52,10 +52,18 @@ public class ExpiredTicketHoldBackgroundService : BackgroundService
         var realtimeNotifier = scope.ServiceProvider.GetRequiredService<ITicketRealtimeNotifier>();
         var redisDb = _redis.GetDatabase();
 
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
         var now = DateTime.UtcNow;
 
         var expiredHolds = await dbContext.TicketHolds
-            .Include(x => x.TicketType)
+            .FromSqlInterpolated($"""
+                SELECT *
+                FROM "TicketHolds"
+                WHERE "Status" = {(int)HoldStatus.Holding}
+                  AND "ExpiredAt" <= {now}
+                FOR UPDATE SKIP LOCKED
+                """)
             .Where(x => x.Status == HoldStatus.Holding && x.ExpiredAt <= now)
             .ToListAsync(cancellationToken);
 
@@ -64,16 +72,26 @@ public class ExpiredTicketHoldBackgroundService : BackgroundService
 
         foreach (var hold in expiredHolds)
         {
-            if (hold.TicketType is null)
+            var ticketType = await dbContext.TicketTypes
+                .FromSqlInterpolated($"""
+                    SELECT *
+                    FROM "TicketTypes"
+                    WHERE "Id" = {hold.TicketTypeId}
+                    FOR UPDATE
+                    """)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (ticketType is null)
                 continue;
 
-            hold.TicketType.Release(hold.Quantity);
+            ticketType.Release(hold.Quantity);
             hold.Expire();
 
             await redisDb.KeyDeleteAsync($"ticket-hold:{hold.HoldCode}");
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         var snapshot = await ticketService.GetInventorySnapshotAsync(cancellationToken);
         await realtimeNotifier.BroadcastInventoryChangedAsync("released", snapshot, cancellationToken);

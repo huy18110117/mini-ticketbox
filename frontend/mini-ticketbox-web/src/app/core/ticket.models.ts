@@ -23,6 +23,7 @@ export interface ReserveTicketRequest {
 export interface ReserveTicketResponse {
   holdCode: string;
   expiredAt: string;
+  serverTimeUtc: string;
 }
 
 export interface PaymentRequest {
