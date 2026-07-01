@@ -32,6 +32,10 @@ export interface PaymentRequest {
   customerEmail: string;
 }
 
+export interface CancelTicketHoldRequest {
+  holdCode: string;
+}
+
 export interface PaymentResponse {
   orderCode: string;
   totalAmount: number;

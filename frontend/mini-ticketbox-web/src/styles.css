@@ -731,6 +731,20 @@ body {
   transform: scale(0.99);
 }
 
+.action-button.cancel-hold {
+  background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+  box-shadow: 0 8px 32px rgba(239, 68, 68, 0.25);
+}
+
+.action-button.cancel-hold:hover:not(:disabled) {
+  transform: scale(1.01);
+  box-shadow: 0 10px 36px rgba(239, 68, 68, 0.35);
+}
+
+.action-button.cancel-hold:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
 .action-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

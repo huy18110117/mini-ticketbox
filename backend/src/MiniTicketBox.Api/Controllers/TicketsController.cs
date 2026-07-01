@@ -57,4 +57,14 @@ public class TicketsController : ControllerBase
 
         return Ok(result);
     }
+
+    [HttpPost("cancel-hold")]
+    public async Task<IActionResult> CancelHold(
+        [FromBody] CancelTicketHoldRequest request,
+        CancellationToken cancellationToken)
+    {
+        await _ticketService.CancelHoldAsync(request, cancellationToken);
+
+        return NoContent();
+    }
 }

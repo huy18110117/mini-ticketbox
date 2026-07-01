@@ -2,11 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using MiniTicketBox.Application.Contracts.Requests;
 using MiniTicketBox.Application.Contracts.Responses;
 using MiniTicketBox.Application.Interfaces;
+using MiniTicketBox.Application.Realtime;
 using MiniTicketBox.Domain.Entities;
+using MiniTicketBox.Domain.Enums;
 using MiniTicketBox.Infrastructure.Persistence;
 using StackExchange.Redis;
-using MiniTicketBox.Domain.Enums;
-using MiniTicketBox.Application.Realtime;
 using System.Text.RegularExpressions;
 
 namespace MiniTicketBox.Infrastructure.Services;
@@ -41,61 +41,67 @@ public class TicketService : ITicketService
         if (request.Quantity <= 0)
             throw new ArgumentException("Số lượng phải lớn hơn 0.");
 
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
 
-        var ticketType = await _dbContext.TicketTypes
-            .FromSqlInterpolated($"""
-                SELECT *
-                FROM "TicketTypes"
-                WHERE "Id" = {request.TicketTypeId}
-                FOR UPDATE
-                """)
-            .FirstOrDefaultAsync(cancellationToken);
+        var response = await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        if (ticketType is null)
-            throw new InvalidOperationException("Không tìm thấy loại vé.");
+            var ticketType = await _dbContext.TicketTypes
+                .FromSqlInterpolated($"""
+                    SELECT *
+                    FROM "TicketTypes"
+                    WHERE "Id" = {request.TicketTypeId}
+                    FOR UPDATE
+                    """)
+                .FirstOrDefaultAsync(cancellationToken);
 
-        if (ticketType.AvailableQuantity < request.Quantity)
-            throw new InvalidOperationException("Không đủ vé khả dụng.");
+            if (ticketType is null)
+                throw new InvalidOperationException("Không tìm thấy loại vé.");
 
-        ticketType.Reserve(request.Quantity);
+            if (ticketType.AvailableQuantity < request.Quantity)
+                throw new InvalidOperationException("Không đủ vé khả dụng.");
 
-        var serverTimeUtc = DateTime.UtcNow;
-        var expiredAt = serverTimeUtc.AddMinutes(5);
+            ticketType.Reserve(request.Quantity);
 
-        var ticketHold = new TicketHold(
-            ticketType.Id,
-            request.Quantity,
-            expiredAt
-        );
+            var serverTimeUtc = DateTime.UtcNow;
+            var expiredAt = serverTimeUtc.AddMinutes(5);
 
-        await _dbContext.TicketHolds.AddAsync(ticketHold, cancellationToken);
+            var ticketHold = new TicketHold(
+                ticketType.Id,
+                request.Quantity,
+                expiredAt
+            );
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.TicketHolds.AddAsync(ticketHold, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
 
-        var redisDb = _redis.GetDatabase();
+            var redisDb = _redis.GetDatabase();
+            var redisKey = $"ticket-hold:{ticketHold.HoldCode}";
 
-        var redisKey = $"ticket-hold:{ticketHold.HoldCode}";
+            await redisDb.StringSetAsync(
+                redisKey,
+                ticketHold.Id.ToString(),
+                expiry: TimeSpan.FromMinutes(5)
+            );
 
-        await redisDb.StringSetAsync(
-            redisKey,
-            ticketHold.Id.ToString(),
-            expiry: TimeSpan.FromMinutes(5)
-        );
+            await transaction.CommitAsync(cancellationToken);
 
-        await transaction.CommitAsync(cancellationToken);
+            return new ReserveTicketResponse
+            {
+                HoldCode = ticketHold.HoldCode,
+                ExpiredAt = ticketHold.ExpiredAt,
+                ServerTimeUtc = serverTimeUtc
+            };
+        });
 
         await BroadcastInventoryChangedAsync("reserved", cancellationToken);
 
-        return new ReserveTicketResponse
-        {
-            HoldCode = ticketHold.HoldCode,
-            ExpiredAt = ticketHold.ExpiredAt,
-            ServerTimeUtc = serverTimeUtc
-        };
+        return response;
     }
+
     public async Task<List<TicketTypeResponse>> GetTicketTypesAsync(
-    CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default)
     {
         return await _dbContext.TicketTypes
             .AsNoTracking()
@@ -173,8 +179,8 @@ public class TicketService : ITicketService
     }
 
     public async Task<PaymentResponse> PayAsync(
-    PaymentRequest request,
-    CancellationToken cancellationToken = default)
+        PaymentRequest request,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.HoldCode))
             throw new ArgumentException("Mã giữ vé là bắt buộc.");
@@ -188,63 +194,127 @@ public class TicketService : ITicketService
         if (!EmailRegex.IsMatch(customerEmail))
             throw new ArgumentException("Email khách hàng không hợp lệ.");
 
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
 
-        var hold = await _dbContext.TicketHolds
-            .FromSqlInterpolated($"""
-                SELECT *
-                FROM "TicketHolds"
-                WHERE "HoldCode" = {request.HoldCode}
-                FOR UPDATE
-                """)
-            .Include(x => x.TicketType)
-            .FirstOrDefaultAsync(cancellationToken);
+        var response = await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        if (hold is null)
-            throw new InvalidOperationException("Không tìm thấy lượt giữ vé.");
+            var hold = await _dbContext.TicketHolds
+                .FromSqlInterpolated($"""
+                    SELECT *
+                    FROM "TicketHolds"
+                    WHERE "HoldCode" = {request.HoldCode}
+                    FOR UPDATE
+                    """)
+                .Include(x => x.TicketType)
+                .FirstOrDefaultAsync(cancellationToken);
 
-        if (hold.Status != HoldStatus.Holding)
-            throw new InvalidOperationException("Lượt giữ vé không khả dụng để thanh toán.");
+            if (hold is null)
+                throw new InvalidOperationException("Không tìm thấy lượt giữ vé.");
 
-        if (hold.ExpiredAt <= DateTime.UtcNow)
-            throw new InvalidOperationException("Lượt giữ vé đã hết hạn.");
+            if (hold.Status != HoldStatus.Holding)
+                throw new InvalidOperationException("Lượt giữ vé không khả dụng để thanh toán.");
 
-        if (hold.TicketType is null)
-            throw new InvalidOperationException("Không tìm thấy loại vé.");
+            if (hold.ExpiredAt <= DateTime.UtcNow)
+                throw new InvalidOperationException("Lượt giữ vé đã hết hạn.");
 
-        var totalAmount = hold.Quantity * hold.TicketType.Price;
+            if (hold.TicketType is null)
+                throw new InvalidOperationException("Không tìm thấy loại vé.");
 
-        var order = new MiniTicketBox.Domain.Entities.Order(
-            totalAmount,
-            customerName,
-            customerEmail);
+            var totalAmount = hold.Quantity * hold.TicketType.Price;
 
-        var orderItem = new OrderItem(
-            hold.TicketTypeId,
-            hold.Quantity,
-            hold.TicketType.Price
-        );
+            var order = new MiniTicketBox.Domain.Entities.Order(
+                totalAmount,
+                customerName,
+                customerEmail);
 
-        order.AddItem(orderItem);
-        order.MarkAsPaid();
-        hold.MarkAsPaid();
+            var orderItem = new OrderItem(
+                hold.TicketTypeId,
+                hold.Quantity,
+                hold.TicketType.Price
+            );
 
-        await _dbContext.Orders.AddAsync(order, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+            order.AddItem(orderItem);
+            order.MarkAsPaid();
+            hold.MarkAsPaid();
 
-        var redisDb = _redis.GetDatabase();
-        await redisDb.KeyDeleteAsync($"ticket-hold:{hold.HoldCode}");
+            await _dbContext.Orders.AddAsync(order, cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
 
-        await transaction.CommitAsync(cancellationToken);
+            var redisDb = _redis.GetDatabase();
+            await redisDb.KeyDeleteAsync($"ticket-hold:{hold.HoldCode}");
+
+            await transaction.CommitAsync(cancellationToken);
+
+            return new PaymentResponse
+            {
+                OrderCode = order.OrderCode,
+                TotalAmount = order.TotalAmount,
+                Status = order.Status.ToString()
+            };
+        });
 
         await BroadcastInventoryChangedAsync("paid", cancellationToken);
 
-        return new PaymentResponse
+        return response;
+    }
+
+    public async Task CancelHoldAsync(
+        CancelTicketHoldRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.HoldCode))
+            throw new ArgumentException("Mã giữ vé là bắt buộc.");
+
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+
+        await strategy.ExecuteAsync(async () =>
         {
-            OrderCode = order.OrderCode,
-            TotalAmount = order.TotalAmount,
-            Status = order.Status.ToString()
-        };
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+            var hold = await _dbContext.TicketHolds
+                .FromSqlInterpolated($"""
+                    SELECT *
+                    FROM "TicketHolds"
+                    WHERE "HoldCode" = {request.HoldCode.Trim()}
+                    FOR UPDATE
+                    """)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (hold is null)
+                throw new InvalidOperationException("Không tìm thấy lượt giữ vé.");
+
+            if (hold.Status != HoldStatus.Holding)
+                throw new InvalidOperationException("Lượt giữ vé không còn khả dụng để hủy.");
+
+            if (hold.ExpiredAt <= DateTime.UtcNow)
+                throw new InvalidOperationException("Lượt giữ vé đã hết hạn.");
+
+            var ticketType = await _dbContext.TicketTypes
+                .FromSqlInterpolated($"""
+                    SELECT *
+                    FROM "TicketTypes"
+                    WHERE "Id" = {hold.TicketTypeId}
+                    FOR UPDATE
+                    """)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (ticketType is null)
+                throw new InvalidOperationException("Không tìm thấy loại vé.");
+
+            ticketType.Release(hold.Quantity);
+            hold.Release();
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            var redisDb = _redis.GetDatabase();
+            await redisDb.KeyDeleteAsync($"ticket-hold:{hold.HoldCode}");
+
+            await transaction.CommitAsync(cancellationToken);
+        });
+
+        await BroadcastInventoryChangedAsync("cancelled", cancellationToken);
     }
 
     private async Task BroadcastInventoryChangedAsync(

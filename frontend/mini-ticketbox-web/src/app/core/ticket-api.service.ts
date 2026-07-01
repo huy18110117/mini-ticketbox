@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AdminDashboard,
+  CancelTicketHoldRequest,
   PaymentRequest,
   PaymentResponse,
   ReserveTicketRequest,
@@ -34,6 +35,10 @@ export class TicketApiService {
 
   pay(request: PaymentRequest): Observable<PaymentResponse> {
     return this.http.post<PaymentResponse>(`${this.apiUrl}/pay`, request);
+  }
+
+  cancelHold(request: CancelTicketHoldRequest): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/cancel-hold`, request);
   }
 
   getAdminDashboard(): Observable<AdminDashboard> {

@@ -16,6 +16,10 @@ public interface ITicketService
         PaymentRequest request,
         CancellationToken cancellationToken = default);
 
+    Task CancelHoldAsync(
+        CancelTicketHoldRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<TicketInventorySnapshotResponse> GetInventorySnapshotAsync(
         CancellationToken cancellationToken = default);
 

@@ -51,51 +51,60 @@ public class ExpiredTicketHoldBackgroundService : BackgroundService
         var ticketService = scope.ServiceProvider.GetRequiredService<ITicketService>();
         var realtimeNotifier = scope.ServiceProvider.GetRequiredService<ITicketRealtimeNotifier>();
         var redisDb = _redis.GetDatabase();
+        var strategy = dbContext.Database.CreateExecutionStrategy();
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-
-        var now = DateTime.UtcNow;
-
-        var expiredHolds = await dbContext.TicketHolds
-            .FromSqlInterpolated($"""
-                SELECT *
-                FROM "TicketHolds"
-                WHERE "Status" = {(int)HoldStatus.Holding}
-                  AND "ExpiredAt" <= {now}
-                FOR UPDATE SKIP LOCKED
-                """)
-            .Where(x => x.Status == HoldStatus.Holding && x.ExpiredAt <= now)
-            .ToListAsync(cancellationToken);
-
-        if (!expiredHolds.Any())
-            return;
-
-        foreach (var hold in expiredHolds)
+        var releasedCount = await strategy.ExecuteAsync(async () =>
         {
-            var ticketType = await dbContext.TicketTypes
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+            var now = DateTime.UtcNow;
+
+            var expiredHolds = await dbContext.TicketHolds
                 .FromSqlInterpolated($"""
                     SELECT *
-                    FROM "TicketTypes"
-                    WHERE "Id" = {hold.TicketTypeId}
-                    FOR UPDATE
+                    FROM "TicketHolds"
+                    WHERE "Status" = {(int)HoldStatus.Holding}
+                      AND "ExpiredAt" <= {now}
+                    FOR UPDATE SKIP LOCKED
                     """)
-                .FirstOrDefaultAsync(cancellationToken);
+                .Where(x => x.Status == HoldStatus.Holding && x.ExpiredAt <= now)
+                .ToListAsync(cancellationToken);
 
-            if (ticketType is null)
-                continue;
+            if (!expiredHolds.Any())
+                return 0;
 
-            ticketType.Release(hold.Quantity);
-            hold.Expire();
+            foreach (var hold in expiredHolds)
+            {
+                var ticketType = await dbContext.TicketTypes
+                    .FromSqlInterpolated($"""
+                        SELECT *
+                        FROM "TicketTypes"
+                        WHERE "Id" = {hold.TicketTypeId}
+                        FOR UPDATE
+                        """)
+                    .FirstOrDefaultAsync(cancellationToken);
 
-            await redisDb.KeyDeleteAsync($"ticket-hold:{hold.HoldCode}");
-        }
+                if (ticketType is null)
+                    continue;
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+                ticketType.Release(hold.Quantity);
+                hold.Expire();
+
+                await redisDb.KeyDeleteAsync($"ticket-hold:{hold.HoldCode}");
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return expiredHolds.Count;
+        });
+
+        if (releasedCount == 0)
+            return;
 
         var snapshot = await ticketService.GetInventorySnapshotAsync(cancellationToken);
         await realtimeNotifier.BroadcastInventoryChangedAsync("released", snapshot, cancellationToken);
 
-        _logger.LogInformation("Released {Count} expired ticket holds.", expiredHolds.Count);
+        _logger.LogInformation("Released {Count} expired ticket holds.", releasedCount);
     }
 }

@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TicketApiService } from '../../core/ticket-api.service';
 import { TicketRealtimeService } from '../../core/ticket-realtime.service';
@@ -7,7 +7,8 @@ import { AdminDashboard } from '../../core/ticket.models';
 
 @Component({
   selector: 'app-admin-dashboard',
-  imports: [CurrencyPipe, DatePipe, RouterLink],
+  standalone: true,
+  imports: [CommonModule, DatePipe, RouterLink],
   templateUrl: './admin-dashboard.component.html',
 })
 export class AdminDashboardComponent implements OnInit {

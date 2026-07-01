@@ -172,6 +172,16 @@
                     Thanh toán ngay
                 }
             </button>
+
+            <button class="action-button cancel-hold" (click)="cancelHold()" [disabled]="busy() || cancellingHold() || remainingSeconds() === 0">
+                @if (cancellingHold()) {
+                    <span class="spinner"></span>
+                    <span>Đang hủy giữ vé...</span>
+                } @else {
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    Hủy giữ vé
+                }
+            </button>
         </div>
     </section>
     }

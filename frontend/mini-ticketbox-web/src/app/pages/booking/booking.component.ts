@@ -1,7 +1,7 @@
-import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
-import { CurrencyPipe } from '@angular/common';
+import { Component, computed, signal, OnInit, OnDestroy } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { RouterLink, RouterLinkActive } from '@angular/router';
 import { interval, Subscription } from 'rxjs';
 import { TicketApiService } from '../../core/ticket-api.service';
 import { TicketRealtimeService } from '../../core/ticket-realtime.service';
@@ -10,7 +10,7 @@ import { ReserveTicketResponse, TicketType } from '../../core/ticket.models';
 @Component({
   selector: 'app-booking',
   standalone: true,
-  imports: [CurrencyPipe, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink,RouterLinkActive],
   templateUrl: './booking.component.html',
 })
 export class BookingComponent implements OnInit, OnDestroy {
@@ -23,6 +23,7 @@ export class BookingComponent implements OnInit, OnDestroy {
   readonly hold = signal<ReserveTicketResponse | null>(null);
   readonly remainingSeconds = signal(0);
   readonly busy = signal(false);
+  readonly cancellingHold = signal(false);
   readonly message = signal('');
   readonly error = signal('');
   readonly customerName = signal('');
@@ -217,6 +218,40 @@ export class BookingComponent implements OnInit, OnDestroy {
     });
   }
 
+  cancelHold(): void {
+    const hold = this.hold();
+
+    if (!hold || this.busy() || this.cancellingHold()) {
+      return;
+    }
+
+    this.cancellingHold.set(true);
+    this.error.set('');
+    this.message.set('');
+
+    this.api.cancelHold({ holdCode: hold.holdCode }).subscribe({
+      next: () => {
+        this.hold.set(null);
+        this.customerName.set('');
+        this.customerEmail.set('');
+        this.submittedPayment.set(false);
+        this.clearActiveHold();
+        this.remainingSeconds.set(0);
+        this.timer?.unsubscribe();
+        this.cancellingHold.set(false);
+        this.message.set('Đã hủy giữ vé. Vé đã được trả lại vào kho.');
+        this.loadTickets();
+      },
+      error: (err) => {
+        this.error.set(
+          this.toVietnameseErrorMessage(err?.error?.message) ??
+            'Hủy giữ vé thất bại. Vui lòng thử lại.'
+        );
+        this.cancellingHold.set(false);
+      },
+    });
+  }
+
   private isValidEmail(email: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
@@ -235,6 +270,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       'A valid customer email is required.': 'Vui lòng nhập email hợp lệ.',
       'Ticket hold not found.': 'Không tìm thấy lượt giữ vé.',
       'Ticket hold is not available for payment.': 'Lượt giữ vé không còn khả dụng để thanh toán.',
+      'Ticket hold is not available for cancellation.': 'Lượt giữ vé không còn khả dụng để hủy.',
       'Ticket hold has expired.': 'Lượt giữ vé đã hết hạn.',
     };
 
