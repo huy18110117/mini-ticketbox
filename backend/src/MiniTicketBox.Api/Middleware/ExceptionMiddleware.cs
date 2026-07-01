@@ -43,7 +43,7 @@ public class ExceptionMiddleware
             await WriteErrorAsync(
                 context,
                 HttpStatusCode.InternalServerError,
-                "Internal server error.");
+                "Lỗi hệ thống. Vui lòng thử lại sau.");
         }
     }
 

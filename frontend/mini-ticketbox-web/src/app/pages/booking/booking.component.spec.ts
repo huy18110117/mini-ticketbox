@@ -120,7 +120,7 @@ describe('BookingComponent', () => {
     component.reserve();
     tick();
 
-    expect(component.error()).toContain('Not enough tickets');
+    expect(component.error()).toContain('Không đủ vé');
     expect(component.busy()).toBeFalse();
   }));
 
@@ -133,7 +133,7 @@ describe('BookingComponent', () => {
 
     component.pay();
 
-    expect(component.error()).toContain('name and a valid email');
+    expect(component.error()).toContain('họ tên và email hợp lệ');
     expect(ticketApi.pay).not.toHaveBeenCalled();
   });
 

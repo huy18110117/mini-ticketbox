@@ -23,13 +23,13 @@ public class OrderItem : BaseEntity
     public OrderItem(Guid ticketTypeId, int quantity, decimal unitPrice)
     {
         if (ticketTypeId == Guid.Empty)
-            throw new ArgumentException("Ticket type is required.");
+            throw new ArgumentException("Loại vé là bắt buộc.");
 
         if (quantity <= 0)
-            throw new ArgumentException("Quantity must be greater than zero.");
+            throw new ArgumentException("Số lượng phải lớn hơn 0.");
 
         if (unitPrice < 0)
-            throw new ArgumentException("Unit price cannot be negative.");
+            throw new ArgumentException("Đơn giá không được âm.");
 
         TicketTypeId = ticketTypeId;
         Quantity = quantity;

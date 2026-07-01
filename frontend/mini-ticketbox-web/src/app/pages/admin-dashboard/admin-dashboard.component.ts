@@ -25,7 +25,7 @@ export class AdminDashboardComponent implements OnInit {
     this.realtime
       .connect()
       .then(() => this.refresh())
-      .catch(() => this.error.set('Realtime connection unavailable.'));
+      .catch(() => this.error.set('Kết nối thời gian thực không khả dụng.'));
   }
 
   refresh(): void {
@@ -35,7 +35,7 @@ export class AdminDashboardComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.error.set('Cannot load admin dashboard.');
+        this.error.set('Không thể tải bảng quản trị.');
         this.loading.set(false);
       },
     });

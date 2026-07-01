@@ -36,10 +36,10 @@ public class TicketService : ITicketService
         CancellationToken cancellationToken = default)
     {
         if (request.TicketTypeId == Guid.Empty)
-            throw new ArgumentException("Ticket type id is required.");
+            throw new ArgumentException("Mã loại vé là bắt buộc.");
 
         if (request.Quantity <= 0)
-            throw new ArgumentException("Quantity must be greater than zero.");
+            throw new ArgumentException("Số lượng phải lớn hơn 0.");
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
@@ -53,10 +53,10 @@ public class TicketService : ITicketService
             .FirstOrDefaultAsync(cancellationToken);
 
         if (ticketType is null)
-            throw new InvalidOperationException("Ticket type not found.");
+            throw new InvalidOperationException("Không tìm thấy loại vé.");
 
         if (ticketType.AvailableQuantity < request.Quantity)
-            throw new InvalidOperationException("Not enough tickets available.");
+            throw new InvalidOperationException("Không đủ vé khả dụng.");
 
         ticketType.Reserve(request.Quantity);
 
@@ -175,16 +175,16 @@ public class TicketService : ITicketService
     CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.HoldCode))
-            throw new ArgumentException("Hold code is required.");
+            throw new ArgumentException("Mã giữ vé là bắt buộc.");
 
         var customerName = request.CustomerName.Trim();
         var customerEmail = request.CustomerEmail.Trim();
 
         if (customerName.Length < 2)
-            throw new ArgumentException("Customer name is required.");
+            throw new ArgumentException("Tên khách hàng là bắt buộc.");
 
         if (!EmailRegex.IsMatch(customerEmail))
-            throw new ArgumentException("A valid customer email is required.");
+            throw new ArgumentException("Email khách hàng không hợp lệ.");
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
@@ -199,16 +199,16 @@ public class TicketService : ITicketService
             .FirstOrDefaultAsync(cancellationToken);
 
         if (hold is null)
-            throw new InvalidOperationException("Ticket hold not found.");
+            throw new InvalidOperationException("Không tìm thấy lượt giữ vé.");
 
         if (hold.Status != HoldStatus.Holding)
-            throw new InvalidOperationException("Ticket hold is not available for payment.");
+            throw new InvalidOperationException("Lượt giữ vé không khả dụng để thanh toán.");
 
         if (hold.ExpiredAt <= DateTime.UtcNow)
-            throw new InvalidOperationException("Ticket hold has expired.");
+            throw new InvalidOperationException("Lượt giữ vé đã hết hạn.");
 
         if (hold.TicketType is null)
-            throw new InvalidOperationException("Ticket type not found.");
+            throw new InvalidOperationException("Không tìm thấy loại vé.");
 
         var totalAmount = hold.Quantity * hold.TicketType.Price;
 

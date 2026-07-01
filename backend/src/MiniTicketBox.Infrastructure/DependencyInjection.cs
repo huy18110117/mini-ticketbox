@@ -29,7 +29,7 @@ public static class DependencyInjection
             var redisConnectionString = configuration["Redis:ConnectionString"];
 
             if (string.IsNullOrWhiteSpace(redisConnectionString))
-                throw new InvalidOperationException("Redis connection string is missing.");
+                throw new InvalidOperationException("Thiếu chuỗi kết nối Redis.");
 
             return ConnectionMultiplexer.Connect(redisConnectionString);
         });

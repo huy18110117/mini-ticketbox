@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
-import { CurrencyPipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { interval, Subscription } from 'rxjs';
@@ -9,6 +9,7 @@ import { ReserveTicketResponse, TicketType } from '../../core/ticket.models';
 
 @Component({
   selector: 'app-booking',
+  standalone: true,
   imports: [CurrencyPipe, FormsModule, RouterLink],
   templateUrl: './booking.component.html',
 })
@@ -47,7 +48,7 @@ export class BookingComponent implements OnInit, OnDestroy {
 
     return this.trimmedCustomerName().length >= 2
       ? ''
-      : 'Please enter your full name.';
+      : 'Vui lòng nhập họ và tên.';
   });
   readonly customerEmailError = computed(() => {
     if (!this.submittedPayment()) {
@@ -56,7 +57,7 @@ export class BookingComponent implements OnInit, OnDestroy {
 
     return this.isValidEmail(this.trimmedCustomerEmail())
       ? ''
-      : 'Please enter a valid email address.';
+      : 'Vui lòng nhập địa chỉ email hợp lệ.';
   });
   readonly isCustomerInfoValid = computed(
     () =>
@@ -77,7 +78,7 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.realtime
       .connect()
       .catch(() =>
-        this.error.set('Realtime connection failed; booking still works.')
+        this.error.set('Kết nối thời gian thực thất bại; bạn vẫn có thể đặt vé.')
       );
   }
 
@@ -93,7 +94,7 @@ export class BookingComponent implements OnInit, OnDestroy {
           this.selectedTicketTypeId.set(tickets[0].id);
         }
       },
-      error: () => this.error.set('Cannot load ticket types.'),
+      error: () => this.error.set('Không thể tải danh sách loại vé.'),
     });
   }
 
@@ -118,13 +119,13 @@ export class BookingComponent implements OnInit, OnDestroy {
           this.startCountdown(hold.expiredAt);
           this.busy.set(false);
           this.message.set(
-            'Ticket is held for 5 minutes. Complete payment before countdown ends.'
+            'Vé đã được giữ trong 5 phút. Vui lòng hoàn tất thanh toán trước khi hết thời gian.'
           );
         },
         error: (err) => {
           this.error.set(
-            err?.error?.message ??
-              'Reserve failed. Please try another ticket type.'
+            this.toVietnameseErrorMessage(err?.error?.message) ??
+              'Giữ vé thất bại. Vui lòng thử loại vé khác.'
           );
           this.busy.set(false);
         },
@@ -140,7 +141,7 @@ export class BookingComponent implements OnInit, OnDestroy {
     }
 
     if (!this.isCustomerInfoValid()) {
-      this.error.set('Please enter your name and a valid email before payment.');
+      this.error.set('Vui lòng nhập họ tên và email hợp lệ trước khi thanh toán.');
       return;
     }
 
@@ -152,7 +153,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       customerEmail: this.trimmedCustomerEmail(),
     }).subscribe({
       next: (payment) => {
-        this.message.set(`Payment success. Order: ${payment.orderCode}`);
+        this.message.set(`Thanh toán thành công. Mã đơn hàng: ${payment.orderCode}`);
         this.hold.set(null);
         this.customerName.set('');
         this.customerEmail.set('');
@@ -164,7 +165,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.error.set(
-          err?.error?.message ?? 'Payment failed or hold expired.'
+          this.toVietnameseErrorMessage(err?.error?.message) ?? 'Thanh toán thất bại hoặc vé đã hết thời gian giữ.'
         );
         this.busy.set(false);
       },
@@ -173,6 +174,26 @@ export class BookingComponent implements OnInit, OnDestroy {
 
   private isValidEmail(email: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  private toVietnameseErrorMessage(message?: string): string | null {
+    if (!message) {
+      return null;
+    }
+
+    const normalizedMessage = message.trim();
+    const translations: Record<string, string> = {
+      'Ticket type id is required.': 'Vui lòng chọn loại vé.',
+      'Not enough tickets available.': 'Không đủ vé còn lại.',
+      'Hold code is required.': 'Thiếu mã giữ vé.',
+      'Customer name is required.': 'Vui lòng nhập họ và tên.',
+      'A valid customer email is required.': 'Vui lòng nhập email hợp lệ.',
+      'Ticket hold not found.': 'Không tìm thấy lượt giữ vé.',
+      'Ticket hold is not available for payment.': 'Lượt giữ vé không còn khả dụng để thanh toán.',
+      'Ticket hold has expired.': 'Lượt giữ vé đã hết hạn.',
+    };
+
+    return translations[normalizedMessage] ?? normalizedMessage;
   }
 
   private startCountdown(expiredAt: string): void {
@@ -185,7 +206,7 @@ export class BookingComponent implements OnInit, OnDestroy {
         this.hold.set(null);
         this.clearActiveHold();
         this.message.set(
-          'Hold expired. Tickets are being released back to inventory.'
+          'Đã hết thời gian giữ vé. Vé đang được trả lại vào kho.'
         );
         this.timer?.unsubscribe();
       }
@@ -213,7 +234,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       this.hold.set(hold);
       this.startCountdown(hold.expiredAt);
       this.message.set(
-        'Ticket is still held. Complete payment before countdown ends.'
+        'Vé vẫn đang được giữ. Vui lòng hoàn tất thanh toán trước khi hết thời gian.'
       );
     } catch {
       this.clearActiveHold();

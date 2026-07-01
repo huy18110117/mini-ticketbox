@@ -19,13 +19,13 @@ public class TicketType : BaseEntity
     public TicketType(string name, decimal price, int totalQuantity)
     {
         if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Ticket type name is required.");
+            throw new ArgumentException("Tên loại vé là bắt buộc.");
 
         if (price < 0)
-            throw new ArgumentException("Ticket price cannot be negative.");
+            throw new ArgumentException("Giá vé không được âm.");
 
         if (totalQuantity <= 0)
-            throw new ArgumentException("Total quantity must be greater than zero.");
+            throw new ArgumentException("Tổng số lượng vé phải lớn hơn 0.");
 
         Name = name;
         Price = price;
@@ -36,10 +36,10 @@ public class TicketType : BaseEntity
     public void Reserve(int quantity)
     {
         if (quantity <= 0)
-            throw new ArgumentException("Reserve quantity must be greater than zero.");
+            throw new ArgumentException("Số lượng vé đặt giữ phải lớn hơn 0.");
 
         if (AvailableQuantity < quantity)
-            throw new InvalidOperationException("Not enough tickets available.");
+            throw new InvalidOperationException("Không đủ vé khả dụng.");
 
         AvailableQuantity -= quantity;
         SetUpdated();
@@ -48,7 +48,7 @@ public class TicketType : BaseEntity
     public void Release(int quantity)
     {
         if (quantity <= 0)
-            throw new ArgumentException("Release quantity must be greater than zero.");
+            throw new ArgumentException("Số lượng vé cần giải phóng phải lớn hơn 0.");
 
         AvailableQuantity += quantity;
 
@@ -61,7 +61,7 @@ public class TicketType : BaseEntity
     public void MarkSold(int quantity)
     {
         if (quantity <= 0)
-            throw new ArgumentException("Sold quantity must be greater than zero.");
+            throw new ArgumentException("Số lượng vé đã bán phải lớn hơn 0.");
 
         SetUpdated();
     }

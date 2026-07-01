@@ -24,13 +24,13 @@ public class Order : BaseEntity
     public Order(decimal totalAmount, string customerName, string customerEmail)
     {
         if (totalAmount < 0)
-            throw new ArgumentException("Total amount cannot be negative.");
+            throw new ArgumentException("Tổng tiền không được âm.");
 
         if (string.IsNullOrWhiteSpace(customerName))
-            throw new ArgumentException("Customer name is required.");
+            throw new ArgumentException("Tên khách hàng là bắt buộc.");
 
         if (string.IsNullOrWhiteSpace(customerEmail))
-            throw new ArgumentException("Customer email is required.");
+            throw new ArgumentException("Email khách hàng là bắt buộc.");
 
         OrderCode = GenerateOrderCode();
         TotalAmount = totalAmount;
@@ -48,7 +48,7 @@ public class Order : BaseEntity
     public void MarkAsPaid()
     {
         if (Status != OrderStatus.Pending)
-            throw new InvalidOperationException("Only pending orders can be paid.");
+            throw new InvalidOperationException("Chỉ đơn hàng đang chờ xử lý mới có thể thanh toán.");
 
         Status = OrderStatus.Paid;
         SetUpdated();
@@ -57,7 +57,7 @@ public class Order : BaseEntity
     public void Cancel()
     {
         if (Status == OrderStatus.Paid)
-            throw new InvalidOperationException("Paid orders cannot be cancelled.");
+            throw new InvalidOperationException("Đơn hàng đã thanh toán không thể hủy.");
 
         Status = OrderStatus.Cancelled;
         SetUpdated();

@@ -24,13 +24,13 @@ public class TicketHold : BaseEntity
     public TicketHold(Guid ticketTypeId, int quantity, DateTime expiredAt)
     {
         if (ticketTypeId == Guid.Empty)
-            throw new ArgumentException("Ticket type id is required.");
+            throw new ArgumentException("Mã loại vé là bắt buộc.");
 
         if (quantity <= 0)
-            throw new ArgumentException("Hold quantity must be greater than zero.");
+            throw new ArgumentException("Số lượng vé giữ chỗ phải lớn hơn 0.");
 
         if (expiredAt <= DateTime.UtcNow)
-            throw new ArgumentException("Expired time must be in the future.");
+            throw new ArgumentException("Thời gian hết hạn phải ở tương lai.");
 
         HoldCode = GenerateHoldCode();
         TicketTypeId = ticketTypeId;
@@ -47,7 +47,7 @@ public class TicketHold : BaseEntity
     public void MarkAsPaid()
     {
         if (Status != HoldStatus.Holding)
-            throw new InvalidOperationException("Only holding tickets can be paid.");
+            throw new InvalidOperationException("Chỉ vé đang được giữ chỗ mới có thể thanh toán.");
 
         Status = HoldStatus.Paid;
         SetUpdated();
@@ -56,7 +56,7 @@ public class TicketHold : BaseEntity
     public void Release()
     {
         if (Status != HoldStatus.Holding)
-            throw new InvalidOperationException("Only holding tickets can be released.");
+            throw new InvalidOperationException("Chỉ vé đang được giữ chỗ mới có thể được giải phóng.");
 
         Status = HoldStatus.Released;
         SetUpdated();
@@ -65,7 +65,7 @@ public class TicketHold : BaseEntity
     public void Expire()
     {
         if (Status != HoldStatus.Holding)
-            throw new InvalidOperationException("Only holding tickets can be expired.");
+            throw new InvalidOperationException("Chỉ vé đang được giữ chỗ mới có thể hết hạn.");
 
         Status = HoldStatus.Expired;
         SetUpdated();

@@ -38,7 +38,7 @@ export class HomeComponent implements OnInit {
       .connect()
       .catch(() =>
         this.error.set(
-          'Realtime connection is unavailable. Data will refresh after actions.'
+          'Kết nối thời gian thực không khả dụng. Dữ liệu sẽ cập nhật sau khi có thao tác.'
         )
       );
   }
@@ -48,13 +48,13 @@ export class HomeComponent implements OnInit {
       next: (tickets) => {
         this.fallbackSnapshot.set(this.createSnapshotFromTicketTypes(tickets));
         this.error.set(
-          'Realtime snapshot endpoint is not available yet. Showing ticket inventory from the basic API.'
+          'API tồn kho thời gian thực chưa khả dụng. Đang hiển thị tồn kho vé từ API cơ bản.'
         );
         this.loading.set(false);
       },
       error: () => {
         this.error.set(
-          'Cannot load ticket inventory. Please retry in a moment.'
+          'Không thể tải tồn kho vé. Vui lòng thử lại sau ít phút.'
         );
         this.loading.set(false);
       },

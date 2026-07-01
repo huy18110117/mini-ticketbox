@@ -1,33 +1,33 @@
 <main class="shell">
-    <nav class="topbar"><a routerLink="/">← Home</a><button class="button ghost" (click)="refresh()">Refresh</button>
+    <nav class="topbar"><a routerLink="/">← Trang chủ</a><button class="button ghost" (click)="refresh()">Làm mới</button>
     </nav>
 
     <section class="card">
-        <p class="eyebrow">Admin dashboard</p>
-        <h1>Sales and temporary locks</h1>
-        <p class="muted">Realtime status: {{ realtime.status() }} · latest event: {{ realtime.lastReason() }}</p>
+        <p class="eyebrow">Bảng quản trị</p>
+        <h1>Doanh số và lượt giữ vé tạm thời</h1>
+        <p class="muted">Trạng thái thời gian thực: {{ realtime.status() }} · sự kiện mới nhất: {{ realtime.lastReason() }}</p>
     </section>
 
-    @if (loading()) { <div class="card muted">Loading dashboard...</div> }
+    @if (loading()) { <div class="card muted">Đang tải bảng quản trị...</div> }
     @if (error()) { <div class="alert">{{ error() }}</div> }
 
     <section class="grid stats">
-        <div class="card"><span>Sold</span><strong>{{ dashboard()?.totalSold ?? 0 }}</strong></div>
-        <div class="card"><span>Holding</span><strong>{{ dashboard()?.totalHolding ?? 0 }}</strong></div>
-        <div class="card"><span>Revenue</span><strong>{{ dashboard()?.revenue ?? 0 | currency:'VND':'symbol':'1.0-0'
+        <div class="card"><span>Đã bán</span><strong>{{ dashboard()?.totalSold ?? 0 }}</strong></div>
+        <div class="card"><span>Đang giữ</span><strong>{{ dashboard()?.totalHolding ?? 0 }}</strong></div>
+        <div class="card"><span>Doanh thu</span><strong>{{ dashboard()?.revenue ?? 0 | currency:'VND':'symbol':'1.0-0'
                 }}</strong></div>
     </section>
 
     <section class="card">
-        <h2>Active holds</h2>
+        <h2>Lượt giữ vé đang hoạt động</h2>
         <div class="table">
-            <div class="table-row head"><span>Hold code</span><span>Ticket</span><span>Qty</span><span>Expires</span>
+            <div class="table-row head"><span>Mã giữ vé</span><span>Vé</span><span>SL</span><span>Hết hạn</span>
             </div>
             @for (hold of dashboard()?.activeHolds ?? []; track hold.id) {
             <div class="table-row"><span>{{ hold.holdCode }}</span><span>{{ hold.ticketTypeName }}</span><span>{{
                     hold.quantity }}</span><span>{{ hold.expiredAt | date:'mediumTime' }}</span></div>
             } @empty {
-            <p class="muted">No temporary locks right now.</p>
+            <p class="muted">Hiện không có lượt giữ vé tạm thời.</p>
             }
         </div>
     </section>

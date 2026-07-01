@@ -1,41 +1,41 @@
 <main class="shell">
-    <nav class="topbar"><a routerLink="/">← Home</a><a routerLink="/admin">Admin</a></nav>
+    <nav class="topbar"><a routerLink="/">← Trang chủ</a><a routerLink="/admin">Quản trị</a></nav>
 
     <section class="card">
-        <p class="eyebrow">Booking</p>
-        <h1>Choose your ticket</h1>
-        <p class="muted">Buttons are disabled while requests are processing to prevent spam clicks under high load.</p>
+        <p class="eyebrow">Đặt vé</p>
+        <h1>Chọn vé của bạn</h1>
+        <p class="muted">Các nút sẽ bị vô hiệu hóa khi yêu cầu đang xử lý để tránh bấm liên tục khi tải cao.</p>
 
         @if (error()) { <div class="alert">{{ error() }}</div> }
         @if (message()) { <div class="success">{{ message() }}</div> }
 
-        <label>Ticket type</label>
+        <label>Loại vé</label>
         <select [ngModel]="selectedTicketTypeId()" (ngModelChange)="selectedTicketTypeId.set($event)"
             [disabled]="busy() || !!hold()">
             @for (ticket of tickets(); track ticket.id) {
-            <option [value]="ticket.id">{{ ticket.name }} · {{ ticket.price | currency:'VND':'symbol':'1.0-0' }} · left
+            <option [value]="ticket.id">{{ ticket.name }} · {{ ticket.price | currency:'VND':'symbol':'1.0-0' }} · còn
                 {{ ticket.availableQuantity }}</option>
             }
         </select>
 
-        <label>Quantity</label>
+        <label>Số lượng</label>
         <input type="number" min="1" max="10" [ngModel]="quantity()" (ngModelChange)="quantity.set(+$event)"
             [disabled]="busy() || !!hold()" />
 
         <button class="button" data-testid="reserve-button" (click)="reserve()" [disabled]="!canReserve()">
-            {{ busy() && !hold() ? 'Đang giữ vé...' : 'Reserve for 5 minutes' }}
+            {{ busy() && !hold() ? 'Đang giữ vé...' : 'Giữ vé trong 5 phút' }}
         </button>
     </section>
 
     @if (hold()) {
     <section class="card hold-box">
-        <span>Hold code</span>
+        <span>Mã giữ vé </span>
         <strong>{{ hold()?.holdCode }}</strong>
         <div class="countdown">{{ countdown() }}</div>
 
         <div class="customer-form">
-            <label for="customerName">Name</label>
-            <input id="customerName" type="text" autocomplete="name" placeholder="Enter your full name"
+            <label for="customerName">Họ và tên</label>
+            <input id="customerName" type="text" autocomplete="name" placeholder="Nhập họ và tên"
                 [ngModel]="customerName()" (ngModelChange)="customerName.set($event)"
                 [disabled]="busy() || remainingSeconds() === 0" />
             @if (customerNameError()) { <small class="field-error">{{ customerNameError() }}</small> }
@@ -48,7 +48,7 @@
         </div>
 
         <button class="button pay" (click)="pay()" [disabled]="busy() || remainingSeconds() === 0">
-            {{ busy() ? 'Processing...' : 'Pay now' }}
+            {{ busy() ? 'Đang xử lý...' : 'Thanh toán ngay' }}
         </button>
     </section>
     }
