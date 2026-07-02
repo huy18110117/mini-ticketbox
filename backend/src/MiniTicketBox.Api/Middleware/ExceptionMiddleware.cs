@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using MiniTicketBox.Application.Common;
 
 namespace MiniTicketBox.Api.Middleware;
 
@@ -22,11 +23,20 @@ public class ExceptionMiddleware
         {
             await _next(context);
         }
+        catch (AppException ex)
+        {
+            await WriteErrorAsync(
+                context,
+                (HttpStatusCode)ex.StatusCode,
+                ex.Code,
+                ex.Message);
+        }
         catch (ArgumentException ex)
         {
             await WriteErrorAsync(
                 context,
                 HttpStatusCode.BadRequest,
+                ErrorCodes.ValidationError,
                 ex.Message);
         }
         catch (InvalidOperationException ex)
@@ -34,6 +44,7 @@ public class ExceptionMiddleware
             await WriteErrorAsync(
                 context,
                 HttpStatusCode.Conflict,
+                ErrorCodes.ValidationError,
                 ex.Message);
         }
         catch (Exception ex)
@@ -43,13 +54,15 @@ public class ExceptionMiddleware
             await WriteErrorAsync(
                 context,
                 HttpStatusCode.InternalServerError,
-                "Lỗi hệ thống. Vui lòng thử lại sau.");
+                ErrorCodes.SystemError,
+                ErrorMessages.SystemError);
         }
     }
 
     private static async Task WriteErrorAsync(
         HttpContext context,
         HttpStatusCode statusCode,
+        string code,
         string message)
     {
         context.Response.StatusCode = (int)statusCode;
@@ -58,6 +71,7 @@ public class ExceptionMiddleware
         var response = new
         {
             success = false,
+            code,
             message
         };
 

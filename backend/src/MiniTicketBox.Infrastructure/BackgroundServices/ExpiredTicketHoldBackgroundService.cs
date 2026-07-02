@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using MiniTicketBox.Application.Common;
 using MiniTicketBox.Application.Interfaces;
 using MiniTicketBox.Application.Realtime;
 using MiniTicketBox.Domain.Enums;
@@ -15,15 +17,18 @@ public class ExpiredTicketHoldBackgroundService : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<ExpiredTicketHoldBackgroundService> _logger;
     private readonly IConnectionMultiplexer _redis;
+    private readonly TicketHoldOptions _holdOptions;
 
     public ExpiredTicketHoldBackgroundService(
         IServiceScopeFactory scopeFactory,
         ILogger<ExpiredTicketHoldBackgroundService> logger,
-        IConnectionMultiplexer redis)
+        IConnectionMultiplexer redis,
+        IOptions<TicketHoldOptions> holdOptions)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         _redis = redis;
+        _holdOptions = holdOptions.Value;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -39,7 +44,7 @@ public class ExpiredTicketHoldBackgroundService : BackgroundService
                 _logger.LogError(ex, "Error while releasing expired ticket holds.");
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+            await Task.Delay(_holdOptions.ExpirationScanInterval, stoppingToken);
         }
     }
 

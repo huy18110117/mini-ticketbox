@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using MiniTicketBox.Application.Common;
 using MiniTicketBox.Application.Contracts.Requests;
 using MiniTicketBox.Application.Contracts.Responses;
 using MiniTicketBox.Application.Interfaces;
@@ -20,15 +22,18 @@ public class TicketService : ITicketService
     private readonly TicketDbContext _dbContext;
     private readonly IConnectionMultiplexer _redis;
     private readonly ITicketRealtimeNotifier _realtimeNotifier;
+    private readonly TicketHoldOptions _holdOptions;
 
     public TicketService(
         TicketDbContext dbContext,
         IConnectionMultiplexer redis,
-        ITicketRealtimeNotifier realtimeNotifier)
+        ITicketRealtimeNotifier realtimeNotifier,
+        IOptions<TicketHoldOptions> holdOptions)
     {
         _dbContext = dbContext;
         _redis = redis;
         _realtimeNotifier = realtimeNotifier;
+        _holdOptions = holdOptions.Value;
     }
 
     public async Task<ReserveTicketResponse> ReserveAsync(
@@ -36,10 +41,10 @@ public class TicketService : ITicketService
         CancellationToken cancellationToken = default)
     {
         if (request.TicketTypeId == Guid.Empty)
-            throw new ArgumentException("Mã loại vé là bắt buộc.");
+            throw new AppException(ErrorCodes.TicketTypeRequired, ErrorMessages.TicketTypeRequired);
 
         if (request.Quantity <= 0)
-            throw new ArgumentException("Số lượng phải lớn hơn 0.");
+            throw new AppException(ErrorCodes.QuantityInvalid, ErrorMessages.QuantityInvalid);
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
 
@@ -57,15 +62,15 @@ public class TicketService : ITicketService
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (ticketType is null)
-                throw new InvalidOperationException("Không tìm thấy loại vé.");
+                throw new AppException(ErrorCodes.TicketTypeNotFound, ErrorMessages.TicketTypeNotFound, 404);
 
             if (ticketType.AvailableQuantity < request.Quantity)
-                throw new InvalidOperationException("Không đủ vé khả dụng.");
+                throw new AppException(ErrorCodes.NotEnoughTickets, ErrorMessages.NotEnoughTickets, 409);
 
             ticketType.Reserve(request.Quantity);
 
             var serverTimeUtc = DateTime.UtcNow;
-            var expiredAt = serverTimeUtc.AddMinutes(5);
+            var expiredAt = serverTimeUtc.Add(_holdOptions.HoldDuration);
 
             var ticketHold = new TicketHold(
                 ticketType.Id,
@@ -82,7 +87,7 @@ public class TicketService : ITicketService
             await redisDb.StringSetAsync(
                 redisKey,
                 ticketHold.Id.ToString(),
-                expiry: TimeSpan.FromMinutes(5)
+                expiry: _holdOptions.HoldDuration
             );
 
             await transaction.CommitAsync(cancellationToken);
@@ -183,16 +188,16 @@ public class TicketService : ITicketService
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.HoldCode))
-            throw new ArgumentException("Mã giữ vé là bắt buộc.");
+            throw new AppException(ErrorCodes.HoldCodeRequired, ErrorMessages.HoldCodeRequired);
 
         var customerName = request.CustomerName.Trim();
         var customerEmail = request.CustomerEmail.Trim();
 
         if (customerName.Length < 2)
-            throw new ArgumentException("Tên khách hàng là bắt buộc.");
+            throw new AppException(ErrorCodes.CustomerNameRequired, ErrorMessages.CustomerNameRequired);
 
         if (!EmailRegex.IsMatch(customerEmail))
-            throw new ArgumentException("Email khách hàng không hợp lệ.");
+            throw new AppException(ErrorCodes.CustomerEmailInvalid, ErrorMessages.CustomerEmailInvalid);
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
 
@@ -211,16 +216,16 @@ public class TicketService : ITicketService
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (hold is null)
-                throw new InvalidOperationException("Không tìm thấy lượt giữ vé.");
+                throw new AppException(ErrorCodes.TicketHoldNotFound, ErrorMessages.TicketHoldNotFound, 404);
 
             if (hold.Status != HoldStatus.Holding)
-                throw new InvalidOperationException("Lượt giữ vé không khả dụng để thanh toán.");
+                throw new AppException(ErrorCodes.TicketHoldPaymentUnavailable, ErrorMessages.TicketHoldPaymentUnavailable, 409);
 
             if (hold.ExpiredAt <= DateTime.UtcNow)
-                throw new InvalidOperationException("Lượt giữ vé đã hết hạn.");
+                throw new AppException(ErrorCodes.TicketHoldExpired, ErrorMessages.TicketHoldExpired, 409);
 
             if (hold.TicketType is null)
-                throw new InvalidOperationException("Không tìm thấy loại vé.");
+                throw new AppException(ErrorCodes.TicketTypeNotFound, ErrorMessages.TicketTypeNotFound, 404);
 
             var totalAmount = hold.Quantity * hold.TicketType.Price;
 
@@ -265,7 +270,7 @@ public class TicketService : ITicketService
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.HoldCode))
-            throw new ArgumentException("Mã giữ vé là bắt buộc.");
+            throw new AppException(ErrorCodes.HoldCodeRequired, ErrorMessages.HoldCodeRequired);
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
 
@@ -283,13 +288,13 @@ public class TicketService : ITicketService
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (hold is null)
-                throw new InvalidOperationException("Không tìm thấy lượt giữ vé.");
+                throw new AppException(ErrorCodes.TicketHoldNotFound, ErrorMessages.TicketHoldNotFound, 404);
 
             if (hold.Status != HoldStatus.Holding)
-                throw new InvalidOperationException("Lượt giữ vé không còn khả dụng để hủy.");
+                throw new AppException(ErrorCodes.TicketHoldCancellationUnavailable, ErrorMessages.TicketHoldCancellationUnavailable, 409);
 
             if (hold.ExpiredAt <= DateTime.UtcNow)
-                throw new InvalidOperationException("Lượt giữ vé đã hết hạn.");
+                throw new AppException(ErrorCodes.TicketHoldExpired, ErrorMessages.TicketHoldExpired, 409);
 
             var ticketType = await _dbContext.TicketTypes
                 .FromSqlInterpolated($"""
@@ -301,7 +306,7 @@ public class TicketService : ITicketService
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (ticketType is null)
-                throw new InvalidOperationException("Không tìm thấy loại vé.");
+                throw new AppException(ErrorCodes.TicketTypeNotFound, ErrorMessages.TicketTypeNotFound, 404);
 
             ticketType.Release(hold.Quantity);
             hold.Release();

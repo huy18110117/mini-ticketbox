@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MiniTicketBox.Infrastructure.Persistence;
 using StackExchange.Redis;
+using MiniTicketBox.Application.Common;
 using MiniTicketBox.Application.Interfaces;
 using MiniTicketBox.Infrastructure.Services;
 using MiniTicketBox.Infrastructure.BackgroundServices;
@@ -14,6 +15,8 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.Configure<TicketHoldOptions>(configuration.GetSection(TicketHoldOptions.SectionName));
+
         services.AddDbContext<TicketDbContext>(options =>
         {
             options.UseNpgsql(

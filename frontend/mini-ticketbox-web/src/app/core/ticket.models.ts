@@ -42,6 +42,12 @@ export interface PaymentResponse {
   status: string;
 }
 
+export interface ApiErrorResponse {
+  success: false;
+  code?: string;
+  message?: string;
+}
+
 export interface ActiveTicketHold {
   id: string;
   holdCode: string;

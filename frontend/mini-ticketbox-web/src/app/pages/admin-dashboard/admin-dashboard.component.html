@@ -23,7 +23,7 @@
         <!-- <button class="admin-btn-ghost" (click)="refresh()">Làm mới</button> -->
     </div>
 
-    <section class="container-card">
+    <section class="container-card hover-lift">
         <p class="section-title-eyebrow" style="color: var(--primary-cyan);">Bảng quản trị</p>
         <h2 class="container-card-title">Doanh số và lượt giữ vé tạm thời</h2>
         <p class="container-card-subtitle">
@@ -46,34 +46,59 @@
     }
 
     <section class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 32px;">
-        <div class="stat-box">
+        <div class="stat-box hover-lift">
             <div class="stat-header">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
                 <span class="stat-label">Đã bán</span>
             </div>
+            @if (loading() && !dashboard()) {
+            <div class="skeleton skeleton-stat"></div>
+            } @else {
             <p class="stat-value">{{ dashboard()?.totalSold ?? 0 }}</p>
+            }
         </div>
 
-        <div class="stat-box">
+        <div class="stat-box hover-lift">
             <div class="stat-header">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 <span class="stat-label">Đang giữ</span>
             </div>
+            @if (loading() && !dashboard()) {
+            <div class="skeleton skeleton-stat"></div>
+            } @else {
             <p class="stat-value">{{ dashboard()?.totalHolding ?? 0 }}</p>
+            }
         </div>
 
-        <div class="stat-box">
+        <div class="stat-box hover-lift">
             <div class="stat-header">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>
                 <span class="stat-label">Doanh thu</span>
             </div>
+            @if (loading() && !dashboard()) {
+            <div class="skeleton skeleton-stat"></div>
+            } @else {
             <p class="stat-value">{{ dashboard()?.revenue ?? 0 | currency:'VND':'symbol':'1.0-0' }}</p>
+            }
         </div>
     </section>
 
-    <section class="container-card">
+    <section class="container-card hover-lift">
         <h3 class="container-card-title" style="font-size: 20px; margin-bottom: 16px;">Lượt giữ vé đang hoạt động</h3>
 
+        @if (loading() && !dashboard()) {
+        <div class="admin-table-skeleton" aria-hidden="true">
+            <div class="skeleton skeleton-line wide"></div>
+            @for (_ of [1, 2, 3, 4]; track $index) {
+            <div class="admin-skeleton-row">
+                <div class="skeleton skeleton-line medium"></div>
+                <div class="skeleton skeleton-line wide"></div>
+                <div class="skeleton skeleton-line short"></div>
+                <div class="skeleton skeleton-line medium"></div>
+            </div>
+            }
+        </div>
+        } @else {
         <div class="admin-table-wrapper">
             <table class="admin-table">
                 <thead>
@@ -102,5 +127,6 @@
                 </tbody>
             </table>
         </div>
+        }
     </section>
 </main>

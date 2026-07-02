@@ -34,7 +34,7 @@
                 Chọn vé ngay
             </a>
         </div>
-        <div class="metric-card">
+        <div class="metric-card hover-lift">
             <div class="metric-label-container">
                 <span class="live-dot">
                     <span class="live-dot-ping"></span>
@@ -42,8 +42,13 @@
                 </span>
                 <span class="metric-label">Đang còn</span>
             </div>
+            @if (loading() && !snapshot()) {
+            <div class="skeleton skeleton-metric"></div>
+            <div class="skeleton skeleton-line short"></div>
+            } @else {
             <p class="metric-value-huge">{{ snapshot()?.totalAvailable ?? 0 }}</p>
             <p class="metric-subtext">Thời gian thực: {{ realtime.status() }} · {{ realtime.lastReason() }}</p>
+            }
         </div>
     </section>
 
@@ -63,8 +68,19 @@
 
     <p class="section-title-eyebrow">Loại vé</p>
     <section class="ticket-grid">
+        @if (loading() && !snapshot()) {
+        @for (_ of [1, 2, 3]; track $index) {
+        <article class="ticket-card skeleton-card" aria-hidden="true">
+            <div class="skeleton skeleton-line medium"></div>
+            <div class="skeleton skeleton-line wide"></div>
+            <div class="skeleton skeleton-pill"></div>
+            <div class="skeleton skeleton-line full"></div>
+        </article>
+        }
+        }
+
         @for (ticket of snapshot()?.ticketTypes ?? []; track ticket.id) {
-        <article class="ticket-card" routerLink="/booking">
+        <article class="ticket-card hover-lift" routerLink="/booking">
             <div class="ticket-card-hover-border"></div>
             <div class="ticket-header">
                 <div>
@@ -93,37 +109,54 @@
     </section>
 
     <section class="stats-grid">
-        <div class="stat-box">
+        <div class="stat-box hover-lift">
             <div class="stat-header">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 <span class="stat-label">Đang giữ</span>
             </div>
+            @if (loading() && !snapshot()) {
+            <div class="skeleton skeleton-stat"></div>
+            } @else {
             <p class="stat-value">{{ snapshot()?.totalHolding ?? 0 }}</p>
+            }
         </div>
 
-        <div class="stat-box">
+        <div class="stat-box hover-lift">
             <div class="stat-header">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
                 <span class="stat-label">Đã bán</span>
             </div>
+            @if (loading() && !snapshot()) {
+            <div class="skeleton skeleton-stat"></div>
+            } @else {
             <p class="stat-value">{{ snapshot()?.totalSold ?? 0 }}</p>
+            }
         </div>
 
-        <div class="stat-box">
+        <div class="stat-box hover-lift">
             <div class="stat-header">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>
                 <span class="stat-label">Doanh thu</span>
             </div>
+            @if (loading() && !snapshot()) {
+            <div class="skeleton skeleton-stat"></div>
+            } @else {
             <p class="stat-value">{{ snapshot()?.revenue ?? 0 | currency:'VND':'symbol':'1.0-0' }}</p>
+            }
         </div>
 
-        <div class="stat-box">
+        <div class="stat-box hover-lift">
             <div class="stat-header">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>
                 <span class="stat-label">Giờ máy chủ</span>
             </div>
+            @if (loading() && !snapshot()) {
+            <div class="skeleton skeleton-stat"></div>
+            <div class="skeleton skeleton-line short"></div>
+            } @else {
             <p class="stat-value">{{ currentServerTimeUtc() | date:'HH:mm:ss' }}</p>
             <span class="stat-sub">server time</span>
+            }
         </div>
     </section>
 </main>

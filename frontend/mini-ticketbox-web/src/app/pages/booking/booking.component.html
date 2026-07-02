@@ -37,6 +37,33 @@
         <p class="container-card-subtitle">Các nút sẽ bị vô hiệu hóa khi yêu cầu đang xử lý để tránh bấm liên tục khi
             tải cao.</p>
 
+        @if (loadingTickets()) {
+        <div class="state-card skeleton-state-card" aria-live="polite">
+            <span class="spinner"></span>
+            <div>
+                <strong>Đang tải danh sách vé...</strong>
+                <span>Hệ thống đang đồng bộ tồn kho mới nhất.</span>
+            </div>
+        </div>
+        <div class="booking-skeleton" aria-hidden="true">
+            <div class="skeleton skeleton-label"></div>
+            <div class="skeleton skeleton-control"></div>
+            <div class="skeleton skeleton-label"></div>
+            <div class="skeleton skeleton-quantity"></div>
+            <div class="skeleton skeleton-button"></div>
+        </div>
+        } @else if (!hasTickets()) {
+        <div class="state-card empty-state">
+            <strong>Chưa có loại vé nào</strong>
+            <span>Vui lòng quay lại sau khi ban tổ chức mở bán.</span>
+        </div>
+        } @else if (!hasAvailableTickets() && !hold()) {
+        <div class="state-card sold-out-state">
+            <strong>Sold out</strong>
+            <span>Tất cả vé hiện đã hết. Nếu có hold bị hủy hoặc hết hạn, tồn kho sẽ tự cập nhật realtime.</span>
+        </div>
+        }
+
         @if (hold() && !submittedPayment() && !error()) {
         <div class="alert-banner info-success">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -72,7 +99,7 @@
 
         <div class="input-group">
             <label class="input-label">Loại vé</label>
-            <button class="custom-select-trigger" [class.active]="showDropdown()" [disabled]="busy() || !!hold()"
+            <button class="custom-select-trigger" [class.active]="showDropdown()" [disabled]="busy() || !!hold() || loadingTickets() || !hasAvailableTickets()"
                 (click)="toggleDropdown()">
                 <span>
                     @if (selectedTicket()) {
@@ -81,6 +108,12 @@
                         {{ selectedTicket()?.price | currency:'VND':'symbol':'1.0-0' }} · còn {{
                         selectedTicket()?.availableQuantity }}
                     </span>
+                    } @else if (hold()) {
+                    Vé đang giữ
+                    } @else if (loadingTickets()) {
+                    Đang tải loại vé...
+                    } @else if (!hasAvailableTickets()) {
+                    Hết vé
                     } @else {
                     Chọn loại vé...
                     }
@@ -128,9 +161,14 @@
 
         <button class="action-button primary" data-testid="reserve-button" (click)="reserve()"
             [disabled]="!canReserve()">
-            @if (busy() && !hold()) {
+            @if (loadingTickets()) {
+            <span class="spinner"></span>
+            <span>Đang tải vé...</span>
+            } @else if (busy() && !hold()) {
             <span class="spinner"></span>
             <span>Đang giữ vé...</span>
+            } @else if (!hasAvailableTickets()) {
+            <span>Đã hết vé</span>
             } @else {
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -156,7 +194,7 @@
                     </p>
                     <div class="hold-progress-track">
                         <div class="hold-progress-bar" [class.warning-time]="remainingSeconds() <= 60"
-                            [style.width.%]="(remainingSeconds() / 300) * 100">
+                            [style.width.%]="(remainingSeconds() / holdDurationSeconds) * 100">
                         </div>
                     </div>
         </div>
@@ -164,7 +202,7 @@
         <div class="hold-body-form">
             <div class="payment-summary-box">
                 <div>
-                    <span class="payment-summary-title">{{ selectedTicket()?.name }}</span>
+                    <span class="payment-summary-title">{{ selectedTicket()?.name ?? 'Vé đang giữ' }}</span>
                     <span class="payment-summary-qty">× {{ quantity() }}</span>
                 </div>
                 <span class="payment-summary-total">
@@ -206,7 +244,7 @@
                 }
             </button>
 
-            <button class="action-button cancel-hold" (click)="cancelHold()"
+            <button class="action-button cancel-hold" (click)="requestCancelHold()"
                 [disabled]="busy() || cancellingHold() || remainingSeconds() === 0">
                 @if (cancellingHold()) {
                 <span class="spinner"></span>
@@ -222,5 +260,25 @@
             </button>
         </div>
     </section>
+    }
+
+    @if (showCancelConfirm()) {
+    <div class="modal-backdrop" role="presentation" (click)="dismissCancelConfirm()">
+        <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="cancelHoldTitle" (click)="$event.stopPropagation()">
+            <h3 id="cancelHoldTitle">Xác nhận hủy giữ vé?</h3>
+            <p>Vé trong mã giữ {{ hold()?.holdCode }} sẽ được trả lại kho ngay lập tức và người khác có thể đặt.</p>
+            <div class="confirm-actions">
+                <button class="confirm-btn secondary" type="button" (click)="dismissCancelConfirm()">Giữ lại</button>
+                <button class="confirm-btn danger" type="button" (click)="cancelHold()" [disabled]="cancellingHold()">
+                    @if (cancellingHold()) {
+                    <span class="spinner"></span>
+                    Đang hủy...
+                    } @else {
+                    Xác nhận hủy
+                    }
+                </button>
+            </div>
+        </section>
+    </div>
     }
 </main>

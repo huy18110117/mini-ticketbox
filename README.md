@@ -110,6 +110,7 @@ Các trang chính:
 - Nếu user hủy hold hoặc hold hết hạn, hệ thống release vé về lại tồn kho.
 - Background service quét hold hết hạn mỗi 30 giây để release vé tự động.
 - Frontend có trang chủ realtime, trang booking có countdown 5 phút và trang admin thống kê số vé đã bán/doanh thu/hold đang khóa.
+- Thời lượng hold và chu kỳ quét hết hạn không hard-code trong service: cấu hình tại `TicketHold:HoldDurationMinutes` và `TicketHold:ExpirationScanIntervalSeconds` trong `appsettings.json`.
 
 ## Giải pháp kỹ thuật chính
 
@@ -144,8 +145,30 @@ Các trang chính:
 - Tách lớp rõ ràng theo Domain/Application/Infrastructure/API.
 - Domain entity chứa logic như reserve/release/mark paid.
 - API dùng controller mỏng, gọi service qua interface.
-- Global exception middleware chuẩn hóa lỗi `400 Bad Request`, `409 Conflict`, `500 Internal Server Error`.
+- Global exception middleware chuẩn hóa lỗi `400 Bad Request`, `404 Not Found`, `409 Conflict`, `500 Internal Server Error` với response gồm `success`, `code`, `message`.
+- `ErrorCodes` và `ErrorMessages` tập trung mã lỗi/thông điệp nghiệp vụ; frontend map `code` sang thông báo UX thân thiện.
 - Request/response contracts tách riêng để API rõ ràng và dễ test.
+
+## Architecture note
+
+```text
+Angular UI
+  ├─ TicketApiService gọi REST API reserve/pay/cancel/snapshot
+  └─ TicketRealtimeService nhận SignalR inventoryChanged
+        │
+ASP.NET Core API
+  ├─ Controllers: endpoint mỏng, validate request model
+  ├─ ExceptionMiddleware: chuẩn hóa ErrorCode/ErrorMessages
+  ├─ Application: contracts, interfaces, realtime abstraction, options
+  ├─ Infrastructure: EF Core DbContext, TicketService, Redis, background worker
+  └─ Domain: TicketType, TicketHold, Order, OrderItem và invariants
+        │
+PostgreSQL + Redis
+  ├─ PostgreSQL transaction + FOR UPDATE chống overselling
+  └─ Redis TTL mirror cho hold 5 phút
+```
+
+Luồng đặt vé đầy đủ: user chọn loại vé trên Angular, API khóa dòng `TicketTypes` bằng `FOR UPDATE`, kiểm tra tồn kho, trừ `AvailableQuantity`, tạo `TicketHold`, lưu Redis TTL theo cấu hình, broadcast SignalR. Khi thanh toán, API khóa hold, tạo order paid và xóa Redis key. Khi hủy hoặc hết hạn, hệ thống release vé về kho và broadcast snapshot mới.
 
 ## Kiểm thử và build
 
@@ -168,7 +191,18 @@ cd frontend/mini-ticketbox-web
 npm run build
 ```
 
-Kết quả kiểm tra hiện tại: backend tests pass, API build pass, Angular build pass.
+Demo test full flow thủ công:
+
+1. Reset dữ liệu và chạy API/UI theo phần “Chạy local”.
+2. Mở `http://localhost:4200/booking`, xác nhận trạng thái loading biến mất và danh sách vé xuất hiện.
+3. Chọn VIP/Standard/Economy, tăng/giảm số lượng, bấm “Giữ vé trong 5 phút”.
+4. Xác nhận countdown chạy, tồn kho trang chủ/admin giảm realtime, reload trang booking vẫn restore hold còn hạn.
+5. Bấm “Hủy giữ vé”, kiểm tra modal confirm xuất hiện; chọn “Giữ lại” để đóng modal.
+6. Bấm lại “Hủy giữ vé” và xác nhận hủy; kiểm tra vé được trả kho realtime.
+7. Đặt vé lại, nhập họ tên/email hợp lệ, thanh toán; kiểm tra order code xuất hiện và admin tăng doanh thu/vé bán.
+8. Test case lỗi: nhập email sai, đặt quá số lượng còn lại, hoặc hết vé để thấy ErrorCode được map sang message UX.
+
+Kết quả kiểm tra hiện tại cần chạy lại sau mỗi thay đổi lớn: backend tests pass, API build pass, Angular build pass.
 
 ## Load test k6: 5.000 người dùng cùng giành vé
 

@@ -5,7 +5,24 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 import { interval, Subscription } from 'rxjs';
 import { TicketApiService } from '../../core/ticket-api.service';
 import { TicketRealtimeService } from '../../core/ticket-realtime.service';
-import { ReserveTicketResponse, TicketType } from '../../core/ticket.models';
+import { ApiErrorResponse, ReserveTicketResponse, TicketType } from '../../core/ticket.models';
+
+const HOLD_DURATION_SECONDS = 5 * 60;
+
+const ERROR_MESSAGES: Record<string, string> = {
+  TICKET_TYPE_REQUIRED: 'Vui lòng chọn loại vé.',
+  QUANTITY_INVALID: 'Số lượng vé không hợp lệ.',
+  TICKET_TYPE_NOT_FOUND: 'Không tìm thấy loại vé.',
+  NOT_ENOUGH_TICKETS: 'Không đủ vé còn lại.',
+  HOLD_CODE_REQUIRED: 'Thiếu mã giữ vé.',
+  CUSTOMER_NAME_REQUIRED: 'Vui lòng nhập họ và tên.',
+  CUSTOMER_EMAIL_INVALID: 'Vui lòng nhập email hợp lệ.',
+  TICKET_HOLD_NOT_FOUND: 'Không tìm thấy lượt giữ vé.',
+  TICKET_HOLD_PAYMENT_UNAVAILABLE: 'Lượt giữ vé không còn khả dụng để thanh toán.',
+  TICKET_HOLD_CANCELLATION_UNAVAILABLE: 'Lượt giữ vé không còn khả dụng để hủy.',
+  TICKET_HOLD_EXPIRED: 'Lượt giữ vé đã hết hạn.',
+  SYSTEM_ERROR: 'Lỗi hệ thống. Vui lòng thử lại sau.',
+};
 
 @Component({
   selector: 'app-booking',
@@ -18,12 +35,15 @@ export class BookingComponent implements OnInit, OnDestroy {
   private serverClockOffsetMs = 0;
 
   readonly tickets = signal<TicketType[]>([]);
+  readonly heldTicket = signal<TicketType | null>(null);
   readonly selectedTicketTypeId = signal('');
   readonly quantity = signal(1);
   readonly hold = signal<ReserveTicketResponse | null>(null);
   readonly remainingSeconds = signal(0);
   readonly busy = signal(false);
   readonly cancellingHold = signal(false);
+  readonly loadingTickets = signal(false);
+  readonly showCancelConfirm = signal(false);
   readonly message = signal('');
   readonly error = signal('');
   readonly customerName = signal('');
@@ -33,8 +53,17 @@ export class BookingComponent implements OnInit, OnDestroy {
 
   readonly selectedTicket = computed(() => {
     const id = this.selectedTicketTypeId();
-    return this.tickets().find((t) => t.id === id) || null;
+    const liveTicket = this.tickets().find((t) => t.id === id);
+    const heldTicket = this.heldTicket();
+
+    return liveTicket || (heldTicket?.id === id ? heldTicket : null);
   });
+
+  readonly holdDurationSeconds = HOLD_DURATION_SECONDS;
+  readonly hasTickets = computed(() => this.tickets().length > 0);
+  readonly hasAvailableTickets = computed(() =>
+    this.tickets().some((ticket) => ticket.availableQuantity > 0)
+  );
 
   readonly maxQuantity = computed(() => {
     const ticket = this.selectedTicket();
@@ -48,6 +77,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       this.maxQuantity() > 0 &&
       this.quantity() <= this.maxQuantity() &&
       !this.busy() &&
+      !this.loadingTickets() &&
       !this.hold()
   );
   readonly countdown = computed(() => {
@@ -122,16 +152,21 @@ export class BookingComponent implements OnInit, OnDestroy {
   }
 
   loadTickets(): void {
+    this.loadingTickets.set(true);
     this.api.getTicketTypes().subscribe({
       next: (tickets) => {
         this.applyTickets(tickets);
+        this.loadingTickets.set(false);
       },
-      error: () => this.error.set('Không thể tải danh sách loại vé.'),
+      error: () => {
+        this.error.set('Không thể tải danh sách loại vé.');
+        this.loadingTickets.set(false);
+      },
     });
   }
 
   toggleDropdown(): void {
-    if (this.busy() || this.hold()) {
+    if (this.busy() || this.hold() || this.loadingTickets() || !this.hasAvailableTickets()) {
       return;
     }
     this.showDropdown.set(!this.showDropdown());
@@ -140,7 +175,7 @@ export class BookingComponent implements OnInit, OnDestroy {
   selectTicketType(id: string): void {
     const ticket = this.tickets().find((t) => t.id === id);
 
-    if (!ticket || ticket.availableQuantity <= 0 || this.busy() || this.hold()) {
+    if (!ticket || ticket.availableQuantity <= 0 || this.busy() || this.hold() || this.loadingTickets()) {
       return;
     }
 
@@ -172,6 +207,9 @@ export class BookingComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const reservedTicket = this.selectedTicket();
+    const reservedQuantity = this.quantity();
+
     this.busy.set(true);
     this.error.set('');
     this.message.set('');
@@ -179,13 +217,15 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.api
       .reserve({
         ticketTypeId: this.selectedTicketTypeId(),
-        quantity: this.quantity(),
+        quantity: reservedQuantity,
       })
       .subscribe({
         next: (hold) => {
           this.syncServerClock(hold.serverTimeUtc);
           this.hold.set(hold);
-          this.saveActiveHold(hold);
+          this.heldTicket.set(reservedTicket);
+          this.quantity.set(reservedQuantity);
+          this.saveActiveHold(hold, reservedTicket, reservedQuantity);
           this.startCountdown(hold.expiredAt);
           this.busy.set(false);
           this.message.set(
@@ -194,7 +234,7 @@ export class BookingComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.error.set(
-            this.toVietnameseErrorMessage(err?.error?.message) ??
+            this.toVietnameseErrorMessage(err?.error) ??
               'Giữ vé thất bại. Vui lòng thử loại vé khác.'
           );
           this.busy.set(false);
@@ -225,6 +265,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       next: (payment) => {
         this.message.set(`Thanh toán thành công. Mã đơn hàng: ${payment.orderCode}`);
         this.hold.set(null);
+        this.heldTicket.set(null);
         this.customerName.set('');
         this.customerEmail.set('');
         this.submittedPayment.set(false);
@@ -236,11 +277,27 @@ export class BookingComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.error.set(
-          this.toVietnameseErrorMessage(err?.error?.message) ?? 'Thanh toán thất bại hoặc vé đã hết thời gian giữ.'
+          this.toVietnameseErrorMessage(err?.error) ?? 'Thanh toán thất bại hoặc vé đã hết thời gian giữ.'
         );
         this.busy.set(false);
       },
     });
+  }
+
+  requestCancelHold(): void {
+    if (!this.hold() || this.busy() || this.cancellingHold() || this.remainingSeconds() === 0) {
+      return;
+    }
+
+    this.showCancelConfirm.set(true);
+  }
+
+  dismissCancelConfirm(): void {
+    if (this.cancellingHold()) {
+      return;
+    }
+
+    this.showCancelConfirm.set(false);
   }
 
   cancelHold(): void {
@@ -251,12 +308,14 @@ export class BookingComponent implements OnInit, OnDestroy {
     }
 
     this.cancellingHold.set(true);
+    this.showCancelConfirm.set(false);
     this.error.set('');
     this.message.set('');
 
     this.api.cancelHold({ holdCode: hold.holdCode }).subscribe({
       next: () => {
         this.hold.set(null);
+        this.heldTicket.set(null);
         this.customerName.set('');
         this.customerEmail.set('');
         this.submittedPayment.set(false);
@@ -269,7 +328,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.error.set(
-          this.toVietnameseErrorMessage(err?.error?.message) ??
+          this.toVietnameseErrorMessage(err?.error) ??
             'Hủy giữ vé thất bại. Vui lòng thử lại.'
         );
         this.cancellingHold.set(false);
@@ -285,8 +344,16 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.tickets.set(tickets);
 
     if (this.hold()) {
+      const selectedTicket = tickets.find((t) => t.id === this.selectedTicketTypeId());
+
+      if (selectedTicket) {
+        this.heldTicket.set(selectedTicket);
+      }
+
       return;
     }
+
+    this.heldTicket.set(null);
 
     const selectedTicket = tickets.find((t) => t.id === this.selectedTicketTypeId());
 
@@ -312,7 +379,15 @@ export class BookingComponent implements OnInit, OnDestroy {
     this.quantity.set(Math.max(1, Math.min(maxVal, this.quantity())));
   }
 
-  private toVietnameseErrorMessage(message?: string): string | null {
+  private toVietnameseErrorMessage(error?: ApiErrorResponse | string): string | null {
+    const code = typeof error === 'object' ? error?.code : undefined;
+
+    if (code && ERROR_MESSAGES[code]) {
+      return ERROR_MESSAGES[code];
+    }
+
+    const message = typeof error === 'string' ? error : error?.message;
+
     if (!message) {
       return null;
     }
@@ -343,6 +418,7 @@ export class BookingComponent implements OnInit, OnDestroy {
       this.remainingSeconds.set(remaining);
       if (remaining === 0) {
         this.hold.set(null);
+        this.heldTicket.set(null);
         this.clearActiveHold();
         this.message.set(
           'Đã hết thời gian giữ vé. Vé đang được trả lại vào kho.'
@@ -377,6 +453,9 @@ export class BookingComponent implements OnInit, OnDestroy {
       }
 
       this.hold.set(hold);
+      this.selectedTicketTypeId.set(stored.selectedTicketTypeId ?? stored.ticket?.id ?? '');
+      this.quantity.set(this.toStoredQuantity(stored.quantity));
+      this.heldTicket.set(stored.ticket ?? null);
       this.startCountdown(hold.expiredAt);
       this.message.set(
         'Vé vẫn đang được giữ. Vui lòng hoàn tất thanh toán trước khi hết thời gian.'
@@ -386,9 +465,16 @@ export class BookingComponent implements OnInit, OnDestroy {
     }
   }
 
-  private saveActiveHold(hold: ReserveTicketResponse): void {
+  private saveActiveHold(
+    hold: ReserveTicketResponse,
+    ticket: TicketType | null,
+    quantity: number
+  ): void {
     const stored: StoredActiveHold = {
       ...hold,
+      selectedTicketTypeId: ticket?.id ?? this.selectedTicketTypeId(),
+      quantity,
+      ticket: ticket ? { ...ticket } : null,
       serverClockOffsetMs: this.serverClockOffsetMs,
       savedAtClientMs: Date.now(),
     };
@@ -430,9 +516,18 @@ export class BookingComponent implements OnInit, OnDestroy {
       serverTimeUtc: stored.serverTimeUtc,
     };
   }
+
+  private toStoredQuantity(value?: number): number {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0
+      ? Math.floor(value)
+      : 1;
+  }
 }
 
 interface StoredActiveHold extends ReserveTicketResponse {
+  selectedTicketTypeId?: string;
+  quantity?: number;
+  ticket?: TicketType | null;
   serverClockOffsetMs?: number;
   savedAtClientMs?: number;
 }
