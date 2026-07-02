@@ -97,10 +97,16 @@
             <div class="custom-select-dropdown">
                 @for (ticket of tickets(); track ticket.id) {
                 <button class="custom-select-option" [class.selected]="ticket.id === selectedTicketTypeId()"
+                    [disabled]="ticket.availableQuantity <= 0"
                     (click)="selectTicketType(ticket.id)">
                     <span style="font-weight: 500;">{{ ticket.name }}</span>
                     <span style="font-family: 'JetBrains Mono', monospace; color: var(--slate-500);">
-                        {{ ticket.price | currency:'VND':'symbol':'1.0-0' }} · còn {{ ticket.availableQuantity }}
+                        {{ ticket.price | currency:'VND':'symbol':'1.0-0' }} ·
+                        @if (ticket.availableQuantity > 0) {
+                        còn {{ ticket.availableQuantity }}
+                        } @else {
+                        hết vé
+                        }
                     </span>
                 </button>
                 }
@@ -113,7 +119,7 @@
             <div class="quantity-control-container">
                 <button class="quantity-btn" (click)="decrementQuantity()"
                     [disabled]="busy() || !!hold() || quantity() <= 1">−</button>
-                <input type="number" class="quantity-input" min="1" max="10" [ngModel]="quantity()"
+                <input type="number" class="quantity-input" min="1" [max]="maxQuantity() || 1" [ngModel]="quantity()"
                     (ngModelChange)="onQuantityChange(+$event)" [disabled]="busy() || !!hold()" />
                 <button class="quantity-btn" (click)="incrementQuantity()"
                     [disabled]="busy() || !!hold() || quantity() >= maxQuantity()">+</button>

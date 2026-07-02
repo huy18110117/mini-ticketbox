@@ -1,4 +1,4 @@
-import { Component, computed, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, computed, effect, signal, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, RouterLinkActive } from '@angular/router';
@@ -38,11 +38,17 @@ export class BookingComponent implements OnInit, OnDestroy {
 
   readonly maxQuantity = computed(() => {
     const ticket = this.selectedTicket();
-    return ticket ? Math.min(ticket.availableQuantity, 10) : 10;
+    return ticket ? Math.min(ticket.availableQuantity, 10) : 0;
   });
 
   readonly canReserve = computed(
-    () => !!this.selectedTicketTypeId() && !this.busy() && !this.hold()
+    () =>
+      !!this.selectedTicketTypeId() &&
+      !!this.selectedTicket() &&
+      this.maxQuantity() > 0 &&
+      this.quantity() <= this.maxQuantity() &&
+      !this.busy() &&
+      !this.hold()
   );
   readonly countdown = computed(() => {
     const seconds = this.remainingSeconds();
@@ -91,7 +97,15 @@ export class BookingComponent implements OnInit, OnDestroy {
   constructor(
     public readonly realtime: TicketRealtimeService,
     private readonly api: TicketApiService
-  ) {}
+  ) {
+    effect(() => {
+      const snapshot = this.realtime.snapshot();
+
+      if (snapshot) {
+        this.applyTickets(snapshot.ticketTypes);
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.restoreActiveHold();
@@ -110,10 +124,7 @@ export class BookingComponent implements OnInit, OnDestroy {
   loadTickets(): void {
     this.api.getTicketTypes().subscribe({
       next: (tickets) => {
-        this.tickets.set(tickets);
-        if (!this.selectedTicketTypeId() && tickets.length) {
-          this.selectedTicketTypeId.set(tickets[0].id);
-        }
+        this.applyTickets(tickets);
       },
       error: () => this.error.set('Không thể tải danh sách loại vé.'),
     });
@@ -127,15 +138,21 @@ export class BookingComponent implements OnInit, OnDestroy {
   }
 
   selectTicketType(id: string): void {
+    const ticket = this.tickets().find((t) => t.id === id);
+
+    if (!ticket || ticket.availableQuantity <= 0 || this.busy() || this.hold()) {
+      return;
+    }
+
     this.selectedTicketTypeId.set(id);
+    this.clampQuantityToAvailable();
     this.showDropdown.set(false);
   }
 
   incrementQuantity(): void {
     if (this.busy() || this.hold()) return;
-    const ticket = this.selectedTicket();
-    if (!ticket) return;
-    const maxVal = Math.min(ticket.availableQuantity, 10);
+    const maxVal = this.maxQuantity();
+    if (maxVal <= 0) return;
     this.quantity.set(Math.min(maxVal, this.quantity() + 1));
   }
 
@@ -145,9 +162,8 @@ export class BookingComponent implements OnInit, OnDestroy {
   }
 
   onQuantityChange(value: number): void {
-    const ticket = this.selectedTicket();
-    const maxVal = ticket ? Math.min(ticket.availableQuantity, 10) : 10;
-    const val = Math.max(1, Math.min(maxVal, value));
+    const maxVal = this.maxQuantity();
+    const val = maxVal > 0 ? Math.max(1, Math.min(maxVal, value)) : 1;
     this.quantity.set(val);
   }
 
@@ -216,6 +232,7 @@ export class BookingComponent implements OnInit, OnDestroy {
         this.remainingSeconds.set(0);
         this.timer?.unsubscribe();
         this.busy.set(false);
+        this.loadTickets();
       },
       error: (err) => {
         this.error.set(
@@ -262,6 +279,37 @@ export class BookingComponent implements OnInit, OnDestroy {
 
   private isValidEmail(email: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  private applyTickets(tickets: TicketType[]): void {
+    this.tickets.set(tickets);
+
+    if (this.hold()) {
+      return;
+    }
+
+    const selectedTicket = tickets.find((t) => t.id === this.selectedTicketTypeId());
+
+    if (!selectedTicket || selectedTicket.availableQuantity <= 0) {
+      this.selectedTicketTypeId.set(this.firstAvailableTicketId(tickets));
+    }
+
+    this.clampQuantityToAvailable();
+  }
+
+  private firstAvailableTicketId(tickets: TicketType[]): string {
+    return tickets.find((ticket) => ticket.availableQuantity > 0)?.id ?? '';
+  }
+
+  private clampQuantityToAvailable(): void {
+    const maxVal = this.maxQuantity();
+
+    if (maxVal <= 0) {
+      this.quantity.set(1);
+      return;
+    }
+
+    this.quantity.set(Math.max(1, Math.min(maxVal, this.quantity())));
   }
 
   private toVietnameseErrorMessage(message?: string): string | null {

@@ -218,4 +218,4 @@ dotnet run --project backend/src/MiniTicketBox.Api/MiniTicketBox.Api.csproj
 
 ## Ghi chú nộp bài
 
-README này đã bao gồm các nội dung theo yêu cầu: họ tên, hướng dẫn chạy local bằng Docker, tech stack, giải thích kiến trúc, giải pháp chống overselling/concurrency, realtime UX, clean code, unit test và load test.
+README này đã bao gồm các nội dung theo yêu cầu: hướng dẫn chạy local bằng Docker, tech stack, giải thích kiến trúc, giải pháp chống overselling/concurrency, realtime UX, clean code, unit test và load test.
