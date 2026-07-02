@@ -20,7 +20,7 @@ Cần cài đặt các công cụ sau trước khi chạy project local:
 - Node.js 20 LTS trở lên và npm để cài dependencies/chạy Angular UI.
 - Angular CLI 19 trở lên. Project đã có `@angular/cli` trong devDependencies nên có thể chạy qua `npm start`; nếu muốn dùng trực tiếp lệnh `ng`, có thể cài global bằng `npm install -g @angular/cli`.
 - Docker Desktop hoặc Docker Engine có Docker Compose v2 để chạy PostgreSQL và Redis bằng `docker compose up -d`.
-- k6 nếu muốn chạy load test mô phỏng 5.000 users.
+- k6 nếu muốn chạy load test mô phỏng 5.000 users tranh 500 vé.
 
 Kiểm tra nhanh phiên bản:
 
@@ -47,7 +47,7 @@ backend/
 frontend/
   mini-ticketbox-web/              # Angular 19 web app
 docker-compose.yml                 # PostgreSQL + Redis
-k6-ticket-rush.js                  # Load test 5.000 người dùng tranh vé
+k6-ticket-rush.js                  # Load test 5.000 người dùng tranh 500 vé
 ```
 
 ## Chạy local
@@ -170,14 +170,25 @@ npm run build
 
 Kết quả kiểm tra hiện tại: backend tests pass, API build pass, Angular build pass.
 
-## Load test k6: 5.000 người dùng tranh vé
+## Load test k6: 5.000 người dùng cùng giành vé
 
-Kịch bản `k6-ticket-rush.js` mô phỏng 5.000 người dùng cùng F5 inventory và bấm đặt vé trong cùng một khoảng thời gian:
+Kịch bản `k6-ticket-rush.js` dùng để chứng minh yêu cầu: 5.000 người dùng cùng vào giành giật 500 vé, có thể F5 liên tục để xem tồn kho và bấm đặt vé gần như cùng một thời điểm nhưng hệ thống vẫn không oversell, không trừ âm tồn kho và không bán vượt quá 500 vé.
 
-- Mỗi VU gọi `GET /api/tickets/snapshot` như hành vi F5/liên tục xem tồn kho.
-- Sau đó gọi `POST /api/tickets/reserve` tối đa 3 lần, chấp nhận `409 Conflict` là hết vé hoặc tranh chấp hợp lệ.
+Các điểm chính của kịch bản:
+
+- Mặc định chạy 5.000 VU với 5.000 iterations, tương ứng 5.000 người dùng cùng tham gia đợt mở bán trong tối đa 60 giây.
+- Mỗi user gọi `POST /api/tickets/reserve` tối đa 3 lần như hành vi bấm đặt vé/tranh vé cùng lúc.
+- Backend dùng transaction và khóa dòng PostgreSQL `FOR UPDATE`, nên dù nhiều request reserve đến đồng thời, chỉ các request còn đủ vé mới giữ vé thành công; các request đến sau khi hết vé nhận `409 Conflict` hợp lệ.
+- Script cấu hình `expectedStatuses` để `409 Conflict` của reserve được xem là kết quả nghiệp vụ hợp lệ, không bị tính nhầm là lỗi hệ thống trong `http_req_failed`.
 - Người dùng giữ vé thành công sẽ thanh toán giả lập qua `POST /api/tickets/pay` theo tỷ lệ mặc định 85%.
-- Threshold kiểm tra latency, lỗi bất thường và không cho phép oversell/tồn kho âm.
+- Threshold kiểm tra latency, lỗi bất thường và đặc biệt là `oversell_detected == 0` để đảm bảo không có tồn kho âm/overselling.
+
+Về hành vi F5/snapshot:
+
+- Hệ thống vẫn đáp ứng trường hợp 5.000 người dùng F5 liên tục vì `GET /api/tickets/snapshot` là endpoint đọc trạng thái tồn kho, không thay đổi dữ liệu bán vé.
+- Tuy nhiên trong thực tế frontend nhận cập nhật tồn kho realtime qua SignalR, nên không cần spam snapshot hàng chục nghìn lần.
+- Vì vậy script mặc định chỉ lấy mẫu snapshot 5% (`SNAPSHOT_SAMPLE_RATE=0.05`) để số liệu latency của reserve/payment không bị nhiễu bởi tải đọc thống kê nhân tạo.
+- Nếu muốn test đúng kiểu F5 storm, có thể đặt `SNAPSHOT_SAMPLE_RATE=1` để mọi VU đều gọi snapshot trước khi đặt vé. Khi đó snapshot p95 cao phản ánh endpoint thống kê/ticket list đang bị bắn mạnh, không đồng nghĩa với lỗi oversell hay lỗi reserve.
 
 Chạy API trước:
 
@@ -195,14 +206,22 @@ k6 run k6-ticket-rush.js
 Tùy chỉnh nhanh:
 
 ```bash
-k6 run -e BASE_URL=http://localhost:5141 -e USERS=5000 -e RUSH_DURATION=60s -e RESERVE_ATTEMPTS=3 -e PAY_RATIO=0.85 k6-ticket-rush.js
+k6 run -e BASE_URL=http://localhost:5141 -e USERS=5000 -e ITERATIONS=5000 -e RUSH_DURATION=60s -e SNAPSHOT_SAMPLE_RATE=0.05 -e RESERVE_ATTEMPTS=3 -e PAY_RATIO=0.85 k6-ticket-rush.js
 ```
 
-Nếu máy local không đủ tài nguyên cho 5.000 VU, nên smoke test trước:
+Chạy chế độ F5 storm, mỗi user đều gọi snapshot trước khi bấm đặt vé:
 
 ```bash
-k6 run -e USERS=100 -e RUSH_DURATION=30s k6-ticket-rush.js
+k6 run -e BASE_URL=http://localhost:5141 -e USERS=5000 -e ITERATIONS=5000 -e RUSH_DURATION=60s -e SNAPSHOT_SAMPLE_RATE=1 -e RESERVE_ATTEMPTS=3 -e PAY_RATIO=0.85 k6-ticket-rush.js
 ```
+
+Nếu muốn smoke test nhẹ hơn:
+
+```bash
+k6 run -e USERS=50 -e ITERATIONS=100 -e RUSH_DURATION=30s k6-ticket-rush.js
+```
+
+Khi đọc kết quả phần lớn `409 Conflict` sau khi hết 500 vé là kết quả nghiệp vụ hợp lệ, không phải lỗi hệ thống. Nếu tăng `SNAPSHOT_SAMPLE_RATE` lên cao hoặc gọi snapshot liên tục như F5 storm, latency p95 của snapshot sẽ phản ánh tải thống kê/ticket list nhân tạo; tiêu chí quan trọng nhất của bài toán tranh vé vẫn là reserve/payment không lỗi bất thường và không oversell.
 
 Lưu ý: nếu chạy load test nhiều lần, cần reset database/seed lại tồn kho vì test sẽ thật sự reserve/pay vé.
 

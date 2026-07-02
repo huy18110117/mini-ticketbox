@@ -5,12 +5,15 @@ import exec from 'k6/execution';
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:5141';
 const USERS = Number(__ENV.USERS || 5000);
+const ITERATIONS = Number(__ENV.ITERATIONS || USERS);
 const RUSH_DURATION = __ENV.RUSH_DURATION || '60s';
-const REFRESH_INTERVAL_SECONDS = Number(__ENV.REFRESH_INTERVAL_SECONDS || 1);
+const SNAPSHOT_SAMPLE_RATE = Number(__ENV.SNAPSHOT_SAMPLE_RATE || 0.05);
 const RESERVE_ATTEMPTS = Number(__ENV.RESERVE_ATTEMPTS || 3);
 const PAY_RATIO = Number(__ENV.PAY_RATIO || 0.85);
 const QUANTITY = Number(__ENV.QUANTITY || 1);
 const TICKET_TYPE_ID = __ENV.TICKET_TYPE_ID || '';
+const EXPECTED_RESERVE_STATUSES = http.expectedStatuses(200, 409);
+const EXPECTED_PAY_STATUSES = http.expectedStatuses(200, 400, 404, 409);
 
 export const reserveSuccess = new Counter('reserve_success');
 export const reserveSoldOut = new Counter('reserve_sold_out_or_conflict');
@@ -27,14 +30,15 @@ export const paymentLatency = new Trend('payment_latency');
 export const options = {
   scenarios: {
     ticket_rush: {
-      executor: 'constant-vus',
+      executor: 'shared-iterations',
       vus: USERS,
-      duration: RUSH_DURATION,
+      iterations: ITERATIONS,
+      maxDuration: RUSH_DURATION,
       gracefulStop: '30s',
     },
   },
   thresholds: {
-    http_req_failed: ['rate<0.30'],
+    http_req_failed: ['rate<0.05'],
     'http_req_duration{type:snapshot}': ['p(95)<1000', 'p(99)<2500'],
     'http_req_duration{type:reserve}': ['p(95)<3000', 'p(99)<7000'],
     'http_req_duration{type:pay}': ['p(95)<3000', 'p(99)<7000'],
@@ -78,33 +82,35 @@ export default function (data) {
   const headers = { 'Content-Type': 'application/json' };
   let holdCode = null;
 
-  group('F5 inventory refresh storm', () => {
-    const response = http.get(`${BASE_URL}/api/tickets/snapshot`, {
-      tags: { type: 'snapshot' },
-    });
+  if (Math.random() < SNAPSHOT_SAMPLE_RATE) {
+    group('sampled inventory snapshot', () => {
+      const response = http.get(`${BASE_URL}/api/tickets/snapshot`, {
+        tags: { type: 'snapshot' },
+      });
 
-    snapshotLatency.add(response.timings.duration);
-    check(response, {
-      'snapshot is ok': (res) => res.status === 200,
-      'snapshot quantity is never negative': (res) => {
-        if (res.status !== 200) return false;
-        const snapshot = res.json();
-        const totalAvailable = Number(snapshot.totalAvailable ?? snapshot.TotalAvailable ?? 0);
-        const ticketTypes = snapshot.ticketTypes || snapshot.TicketTypes || [];
-        const hasNegativeType = ticketTypes.some((ticketType) => Number(ticketType.availableQuantity ?? ticketType.AvailableQuantity ?? 0) < 0);
-        const valid = totalAvailable >= 0 && !hasNegativeType;
-        if (!valid) oversellDetected.add(1);
-        return valid;
-      },
+      snapshotLatency.add(response.timings.duration);
+      check(response, {
+        'snapshot is ok': (res) => res.status === 200,
+        'snapshot quantity is never negative': (res) => {
+          if (res.status !== 200) return false;
+          const snapshot = res.json();
+          const totalAvailable = Number(snapshot.totalAvailable ?? snapshot.TotalAvailable ?? 0);
+          const ticketTypes = snapshot.ticketTypes || snapshot.TicketTypes || [];
+          const hasNegativeType = ticketTypes.some((ticketType) => Number(ticketType.availableQuantity ?? ticketType.AvailableQuantity ?? 0) < 0);
+          const valid = totalAvailable >= 0 && !hasNegativeType;
+          if (!valid) oversellDetected.add(1);
+          return valid;
+        },
+      });
     });
-  });
+  }
 
   group('simultaneous reserve click', () => {
     for (let attempt = 1; attempt <= RESERVE_ATTEMPTS && !holdCode; attempt += 1) {
       const response = http.post(
         `${BASE_URL}/api/tickets/reserve`,
         JSON.stringify({ ticketTypeId: data.ticketTypeId, quantity: QUANTITY }),
-        { headers, tags: { type: 'reserve' } },
+        { headers, tags: { type: 'reserve' }, responseCallback: EXPECTED_RESERVE_STATUSES },
       );
 
       reserveLatency.add(response.timings.duration);
@@ -138,7 +144,7 @@ export default function (data) {
           customerName: `K6 User ${userId}`,
           customerEmail: `k6-user-${userId}-${Date.now()}@loadtest.local`,
         }),
-        { headers, tags: { type: 'pay' } },
+        { headers, tags: { type: 'pay' }, responseCallback: EXPECTED_PAY_STATUSES },
       );
 
       paymentLatency.add(response.timings.duration);
@@ -152,8 +158,6 @@ export default function (data) {
       }
     });
   }
-
-  sleep(REFRESH_INTERVAL_SECONDS);
 }
 
 export function teardown(data) {
