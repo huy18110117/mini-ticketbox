@@ -1,6 +1,6 @@
 import { Component, computed, effect, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { RouterLink, RouterLinkActive } from '@angular/router';
 import { TicketApiService } from '../../core/ticket-api.service';
 import { TicketRealtimeService } from '../../core/ticket-realtime.service';
 import { TicketInventorySnapshot, TicketType } from '../../core/ticket.models';
@@ -8,7 +8,7 @@ import { TicketInventorySnapshot, TicketType } from '../../core/ticket.models';
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, DatePipe, RouterLink],
+  imports: [CommonModule, DatePipe, RouterLink, RouterLinkActive],
   templateUrl: './home.component.html',
 })
 export class HomeComponent {
